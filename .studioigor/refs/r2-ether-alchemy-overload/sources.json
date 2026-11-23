@@ -1,0 +1,143 @@
+{
+  "title": "Кристальный брутализм и Разряд",
+  "text": "Правило: мокрый чёрный базальт с врезанными кристаллами и силовыми шинами; в норме горит холодный циан-кварц, при Перегрузке Канала всё заливает аварийный багровый свет. Свет: отражения на мокром камне, объёмные лучи, резкие тени. Форма: острые кристаллы и монолитные блоки без завитушек. Цвет: мокрый графит, глубокий чёрный, белый кварц, электрический циан и аварийный багровый.",
+  "palette": [
+    "#ffffff",
+    "#292222",
+    "#b93826",
+    "#679793",
+    "#c7a24b",
+    "#946231"
+  ],
+  "tags": [
+    "R2 микс",
+    "Кристалл + Брутализм",
+    "под Перегрузку"
+  ],
+  "items": [
+    {
+      "file": "wikimedia-f3489c34.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c1/Fluorite_%28Crystal_Victory_Mine%2C_near_Cave-in-Rock%2C_Illinois%2C_USA%29_2_%2834430613991%29.jpg/1280px-Fluorite_%28Crystal_Victory_Mine%2C_near_Cave-in-Rock%2C_Illinois%2C_USA%29_2_%2834430613991%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Fluorite_(Crystal_Victory_Mine,_near_Cave-in-Rock,_Illinois,_USA)_2_(34430613991).jpg",
+      "title": "Fluorite (Crystal Victory Mine, near Cave-in-Rock, Illinois, USA) 2 (34430613991)",
+      "credit": "James St. John",
+      "license": "CC BY 2.0",
+      "api": "wikimedia",
+      "query": "fluorite crystal black",
+      "generated": false,
+      "note": "Кубические чёрные кристаллы флюорита на тёплой янтарной матрице",
+      "w": 1280,
+      "h": 1583,
+      "sha1": "f3489c3478947d3cb7fcb821c00b76d74c3b18f6"
+    },
+    {
+      "file": "steam-54870213.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/462770/ss_2107ff862d576593c794b3bd53a2916b44ca03bb.1920x1080.jpg?t=1729114062",
+      "page": "https://store.steampowered.com/app/462770/",
+      "title": "Pyre — screenshot 1",
+      "credit": "Supergiant Games",
+      "license": "© Supergiant Games — moodboard only",
+      "api": "steam",
+      "query": "Pyre",
+      "generated": false,
+      "note": "Циановые кольца и след разряда Эфира на тёмном полу арены",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "54870213a6c30c5ecc0c5408e44bc58d87b093c5"
+    },
+    {
+      "file": "steam-3699b7e3.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270790/ss_3699b7e34b321e89e0820fc42616fbc3eaa4d541.1920x1080.jpg?t=1570706747",
+      "page": "https://store.steampowered.com/app/270790/",
+      "title": "Etherlords II — screenshot 3",
+      "credit": "Nival",
+      "license": "© Nival — moodboard only",
+      "api": "steam",
+      "query": "Etherlords II",
+      "generated": false,
+      "note": "Столкновение техно-синтета и фэнтези-бойца, тёплое огненное свечение атаки",
+      "w": 1280,
+      "h": 720,
+      "sha1": "3699b7e34b321e89e0820fc42616fbc3eaa4d541"
+    },
+    {
+      "file": "wikimedia-1b2c2f7b.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c6/Tetrahedrite_-_Black_Pine_mine%2C_Granite_Co.%2C_Montana%2C_USA.jpg/1280px-Tetrahedrite_-_Black_Pine_mine%2C_Granite_Co.%2C_Montana%2C_USA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Tetrahedrite_-_Black_Pine_mine,_Granite_Co.,_Montana,_USA.jpg",
+      "title": "Tetrahedrite - Black Pine mine, Granite Co., Montana, USA",
+      "credit": "Ivar Leidus",
+      "license": "CC BY-SA 4.0",
+      "api": "wikimedia",
+      "query": "quartz crystal mineral",
+      "generated": false,
+      "note": "Контраст тёмной металлической породы и острых белых кристаллов",
+      "w": 1280,
+      "h": 960,
+      "sha1": "1b2c2f7bb78b373cd97047c7460098962002a68e"
+    },
+    {
+      "file": "steam-98583559.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/237930/ss_9858355976e979758841f05839ccc6224ddaa00e.1920x1080.jpg?t=1729113992",
+      "page": "https://store.steampowered.com/app/237930/",
+      "title": "Transistor — screenshot 2",
+      "credit": "Supergiant Games",
+      "license": "© Supergiant Games — moodboard only",
+      "api": "steam",
+      "query": "Transistor",
+      "generated": false,
+      "note": "Яркий бирюзовый энергетический клинок на тёмном фоне и золотые схемы",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "9858355976e979758841f05839ccc6224ddaa00e"
+    },
+    {
+      "file": "steam-4687ad26.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/3669870/422f3eed36d3033c4b0f4fde485c29b980e49454/ss_422f3eed36d3033c4b0f4fde485c29b980e49454.1920x1080.jpg?t=1794586294",
+      "page": "https://store.steampowered.com/app/3669870/",
+      "title": "CONTROL Resonant — screenshot 1",
+      "credit": "Remedy Entertainment",
+      "license": "© Remedy Entertainment — moodboard only",
+      "api": "steam",
+      "query": "CONTROL Resonant",
+      "generated": false,
+      "note": "Энергетический разряд в руках мага-оператора, отражения на мокром камне",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "4687ad260a2979c6ac4af115d32c28345b832a39"
+    },
+    {
+      "file": "steam-7a582a07.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/870780/ss_5a16ce565951479e142c56a23f19d88333d84945.1920x1080.jpg?t=1781607969",
+      "page": "https://store.steampowered.com/app/870780/",
+      "title": "CONTROL Ultimate Edition — screenshot 2",
+      "credit": "Remedy Entertainment",
+      "license": "© Remedy Entertainment — moodboard only",
+      "api": "steam",
+      "query": "CONTROL Ultimate Edition",
+      "generated": false,
+      "note": "Монолитный бетонный зал в аварийном красном свете при перегрузке",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "7a582a07ebffcdb474f441392cfd016e42cfaf56"
+    }
+  ],
+  "pros": [
+    "Перегрузка Канала читается без единого слова UI за счёт смены цвета света и искр",
+    "мощные отражения"
+  ],
+  "cons": [
+    "риск уйти в техногенный sci-fi вместо фэнтези четырёх школ"
+  ],
+  "dropped": [
+    {
+      "file": "wikimedia-0ee3828c.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/eb/Fluorite_%28Crystal_Victory_Mine%2C_near_Cave-in-Rock%2C_Illinois%2C_USA%29_1_%2834519726136%29.jpg/1280px-Fluorite_%28Crystal_Victory_Mine%2C_near_Cave-in-Rock%2C_Illinois%2C_USA%29_1_%2834519726136%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "sha1": "0ee3828cd610e7d903949758af31d1ab67b55b44"
+    },
+    {
+      "file": "steam-bf0e112a.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/462770/ss_07ec2b0ca26795d393f6e479b629f99e2f960cb1.1920x1080.jpg?t=1729114062",
+      "sha1": "bf0e112aaf50ad3600fee5ee2df8bf10f12cd95a"
+    }
+  ]
+}

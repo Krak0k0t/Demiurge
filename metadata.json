@@ -1,0 +1,8 @@
+{
+  "name": "Duel of Demiurges realistic",
+  "description": "Установленный скилл studioigor для пошаговой разработки игр: пайплайн из 10 фаз, модули, шаблоны ролей и проверка окружения.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

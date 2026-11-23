@@ -1,0 +1,121 @@
+{
+  "title": "Кристальное техно-фэнтези (дух Nival)",
+  "text": "Правило: школа меняет цвет кристаллической арены, а Канал Эфира виден как живая нить от демиурга к существам. Свет: холодные сумерки и тёплая бронза. Форма: гранёные кристаллы и рунические пьедесталы. Цвет: базальтово-синий, бронза, акценты 4 школ.",
+  "palette": [],
+  "tags": [
+    "3D",
+    "близко к референсу",
+    "Three.js"
+  ],
+  "items": [
+    {
+      "file": "steam-74343fc4.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270790/ss_74343fc48021ed2c79fd1f895eed2cf73f82d05e.1920x1080.jpg?t=1570706747",
+      "page": "https://store.steampowered.com/app/270790/",
+      "title": "Etherlords II — screenshot 1",
+      "credit": "Nival",
+      "license": "© Nival — moodboard only",
+      "api": "steam",
+      "query": "Etherlords II",
+      "generated": false,
+      "note": "Ракурс дуэли: два демиурга по краям, схватка существ в центре, цифры статов над фигурами",
+      "w": 1280,
+      "h": 720,
+      "sha1": "74343fc48021ed2c79fd1f895eed2cf73f82d05e"
+    },
+    {
+      "file": "steam-5a2ad227.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270790/ss_5a2ad227336ce343533b8796e703666f59430318.1920x1080.jpg?t=1570706747",
+      "page": "https://store.steampowered.com/app/270790/",
+      "title": "Etherlords II — screenshot 2",
+      "credit": "Nival",
+      "license": "© Nival — moodboard only",
+      "api": "steam",
+      "query": "Etherlords II",
+      "generated": false,
+      "note": "Читаемость заклинаний: яркие световые дуги и рунические круги под ногами существ",
+      "w": 1280,
+      "h": 720,
+      "sha1": "5a2ad227336ce343533b8796e703666f59430318"
+    },
+    {
+      "file": "steam-3699b7e3.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270790/ss_3699b7e34b321e89e0820fc42616fbc3eaa4d541.1920x1080.jpg?t=1570706747",
+      "page": "https://store.steampowered.com/app/270790/",
+      "title": "Etherlords II — screenshot 3",
+      "credit": "Nival",
+      "license": "© Nival — moodboard only",
+      "api": "steam",
+      "query": "Etherlords II",
+      "generated": false,
+      "note": "Столкновение техно-синтета и фэнтези-бойца, тёплое огненное свечение атаки",
+      "w": 1280,
+      "h": 720,
+      "sha1": "3699b7e34b321e89e0820fc42616fbc3eaa4d541"
+    },
+    {
+      "file": "steam-b1cd2995.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270790/ss_b1cd2995efc8724c50070974527fe64934982330.1920x1080.jpg?t=1570706747",
+      "page": "https://store.steampowered.com/app/270790/",
+      "title": "Etherlords II — screenshot 4",
+      "credit": "Nival",
+      "license": "© Nival — moodboard only",
+      "api": "steam",
+      "query": "Etherlords II",
+      "generated": false,
+      "note": "Каменные пьедесталы с бирюзовыми рунами и кристальными обелисками",
+      "w": 1280,
+      "h": 720,
+      "sha1": "b1cd2995efc8724c50070974527fe64934982330"
+    },
+    {
+      "file": "wikimedia-c050d97b.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/Quartz%2C_Tibet.jpg/1280px-Quartz%2C_Tibet.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Quartz,_Tibet.jpg",
+      "title": "Quartz, Tibet",
+      "credit": "JJ Harrison (https://www.jjharrison.com.au/)",
+      "license": "CC BY-SA 2.5",
+      "api": "wikimedia",
+      "query": "quartz crystal mineral",
+      "generated": false,
+      "note": "Огранка прозрачного кварца и радужные преломления граней на тёмном фоне",
+      "w": 1280,
+      "h": 1283,
+      "sha1": "c050d97b78627fd316b811732f6a8371ebea8ca3"
+    },
+    {
+      "file": "wikimedia-1b2c2f7b.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c6/Tetrahedrite_-_Black_Pine_mine%2C_Granite_Co.%2C_Montana%2C_USA.jpg/1280px-Tetrahedrite_-_Black_Pine_mine%2C_Granite_Co.%2C_Montana%2C_USA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Tetrahedrite_-_Black_Pine_mine,_Granite_Co.,_Montana,_USA.jpg",
+      "title": "Tetrahedrite - Black Pine mine, Granite Co., Montana, USA",
+      "credit": "Ivar Leidus",
+      "license": "CC BY-SA 4.0",
+      "api": "wikimedia",
+      "query": "quartz crystal mineral",
+      "generated": false,
+      "note": "Контраст тёмной металлической породы и острых белых кристаллов",
+      "w": 1280,
+      "h": 960,
+      "sha1": "1b2c2f7bb78b373cd97047c7460098962002a68e"
+    }
+  ],
+  "pros": [
+    "мгновенно узнаётся атмосфера Etherlords",
+    "высокая читаемость школ по цвету"
+  ],
+  "cons": [
+    "легко скатиться в обычное фэнтези без строгой геометрии света"
+  ],
+  "dropped": [
+    {
+      "file": "steam-608e82a8.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270770/ss_608e82a871547dd0fabf5a7bb2441b0c1cbe13df.1920x1080.jpg?t=1570706739",
+      "sha1": "608e82a871547dd0fabf5a7bb2441b0c1cbe13df"
+    },
+    {
+      "file": "steam-807fefa5.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270770/ss_807fefa5fe0611174cd2568fec1ee3f837afb5f0.1920x1080.jpg?t=1570706739",
+      "sha1": "807fefa5fe0611174cd2568fec1ee3f837afb5f0"
+    }
+  ]
+}

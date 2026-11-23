@@ -1,0 +1,125 @@
+{
+  "title": "Обсидиан и жидкое золото (смелое)",
+  "text": "Правило: всё поле и тела существ — тёмный матовый обсидиан; светятся только Эфир, контуры (rim light) и трещины перегрузки. Свет: жёсткий контровой. Форма: монолитные резкие силуэты без мелкого шума.",
+  "palette": [],
+  "tags": [
+    "3D",
+    "высокий контраст",
+    "минимум текстур"
+  ],
+  "items": [
+    {
+      "file": "steam-57771dd3.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1092790/ss_0191a69b0e94a9a7784f5b81e27f06379910645a.1920x1080.jpg?t=1777572925",
+      "page": "https://store.steampowered.com/app/1092790/",
+      "title": "Inscryption — screenshot 1",
+      "credit": "Daniel Mullins Games",
+      "license": "© Daniel Mullins Games — moodboard only",
+      "api": "steam",
+      "query": "Inscryption",
+      "generated": false,
+      "note": "Тёмный стол дуэли: минимум лишнего фона, только светящиеся слоты и тёплые карты",
+      "w": 1920,
+      "h": 1079,
+      "sha1": "57771dd387273ff0f2750383a92116e345d07472"
+    },
+    {
+      "file": "steam-c8c721fd.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1092790/ss_7bfe728822807d232398df1cb1a5d64addd3d8fb.1920x1080.jpg?t=1777572925",
+      "page": "https://store.steampowered.com/app/1092790/",
+      "title": "Inscryption — screenshot 3",
+      "credit": "Daniel Mullins Games",
+      "license": "© Daniel Mullins Games — moodboard only",
+      "api": "steam",
+      "query": "Inscryption",
+      "generated": false,
+      "note": "Силуэт соперника растворён во тьме — видны лишь светящиеся глаза и знаки",
+      "w": 1920,
+      "h": 1079,
+      "sha1": "c8c721fd7ee99f7ffa5d25b805f7934fcd936e01"
+    },
+    {
+      "file": "steam-928c896d.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1466060/9c00e471d2cb0690a3f2b0959dc64593ef0e1eb8/ss_9c00e471d2cb0690a3f2b0959dc64593ef0e1eb8.1920x1080.jpg?t=1793295003",
+      "page": "https://store.steampowered.com/app/1466060/",
+      "title": "Tainted Grail: The Fall of Avalon — screenshot 1",
+      "credit": "Questline",
+      "license": "© Questline — moodboard only",
+      "api": "steam",
+      "query": "Tainted Grail: The Fall of Avalon",
+      "generated": false,
+      "note": "Тёмные монолитные столбы арены с золотым внутренним свечением",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "928c896daba962c42adfdfdfb9fd242c17ee709f"
+    },
+    {
+      "file": "wikimedia-43660368.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/7/76/Black_obsidian_with_streaks_of_mahogany_obsidian.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "page": "https://commons.wikimedia.org/wiki/File:Black_obsidian_with_streaks_of_mahogany_obsidian.jpg",
+      "title": "Black obsidian with streaks of mahogany obsidian",
+      "credit": "James St. John",
+      "license": "CC BY 2.0",
+      "api": "wikimedia",
+      "query": "obsidian black mineral",
+      "generated": false,
+      "note": "Глубокий чёрный обсидиан с тёплыми медно-золотыми прожилками",
+      "w": 1005,
+      "h": 854,
+      "sha1": "436603682de93359419e99bea8c278b67c0996ee"
+    },
+    {
+      "file": "wikimedia-5d9986a9.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Obsidian_44.jpg/1280px-Obsidian_44.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Obsidian_44.jpg",
+      "title": "Obsidian 44",
+      "credit": "James St. John",
+      "license": "CC BY 2.0",
+      "api": "wikimedia",
+      "query": "obsidian black mineral",
+      "generated": false,
+      "note": "Острый раковистый скол тёмного стекла для форм пьедесталов",
+      "w": 1280,
+      "h": 997,
+      "sha1": "5d9986a93877030abea1fad75a884ee607c75281"
+    },
+    {
+      "file": "steam-00f9647c.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1199030/ss_338a18da2f82060ab2e22adf11cfd0395209fb2a.1920x1080.jpg?t=1748103885",
+      "page": "https://store.steampowered.com/app/1199030/",
+      "title": "Tainted Grail: Conquest — screenshot 1",
+      "credit": "Questline",
+      "license": "© Questline — moodboard only",
+      "api": "steam",
+      "query": "Tainted Grail: Conquest",
+      "generated": false,
+      "note": "Бой от третьего лица с рукой карт, светящимся щитом и тёмным фоном арены",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "00f9647ce3579943783645912203068bc15ebf0d"
+    }
+  ],
+  "pros": [
+    "невероятная читаемость за 1 секунду и дешёвый рендер в браузере"
+  ],
+  "cons": [
+    "мрачная палитра требует аккуратного контраста карт"
+  ],
+  "dropped": [
+    {
+      "file": "steam-f107352b.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1092790/ss_3b714682e9e0a214df1630a234e9f6764528eece.1920x1080.jpg?t=1777572925",
+      "sha1": "f107352b1270abd75c33f5fba341a78d14180cea"
+    },
+    {
+      "file": "steam-380b5d66.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1466060/64b45ad0eaf748ff8d4c9bfef51e622638902e37/ss_64b45ad0eaf748ff8d4c9bfef51e622638902e37.1920x1080.jpg?t=1793295003",
+      "sha1": "380b5d666c4b4c0fa02c33b6fc345c78ca99facd"
+    },
+    {
+      "file": "steam-e6483855.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1199030/ss_91b71f32034edac8913efddbc0b5728f213caf23.1920x1080.jpg?t=1748103885",
+      "sha1": "e648385580cbc52c5f9ac44db57e019aec7e3e6b"
+    }
+  ]
+}

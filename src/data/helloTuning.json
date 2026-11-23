@@ -1,0 +1,8 @@
+{
+  "moveSpeed": 4.2,
+  "arenaRadius": 3.6,
+  "baseEther": 3,
+  "overloadBonusEther": 2,
+  "overloadHpCost": 3,
+  "startHp": 25
+}

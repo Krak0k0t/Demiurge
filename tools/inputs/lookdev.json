@@ -1,0 +1,5 @@
+[
+  { "t": 0.9, "eval": "window.__LOOKDEV_SET_PRESET__?.('closeup')" },
+  { "t": 1.9, "eval": "window.__LOOKDEV_SET_PRESET__?.('wide')" },
+  { "t": 2.9, "eval": "window.__LOOKDEV_SET_PRESET__?.('combat'); window.__GAME__?.toggleOverload?.()" }
+]

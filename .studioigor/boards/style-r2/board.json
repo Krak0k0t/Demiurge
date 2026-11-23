@@ -1,0 +1,248 @@
+{
+  "title": "Стиль — Раунд 2 (Синтез)",
+  "subtitle": "Дуэль Демиургов: 3 микс-варианта на основе 12 ваших лайков из Раунда 1",
+  "question": "Какой из трёх миксов берём за основу Арт-библии (или что докрутить)?",
+  "mode": "single",
+  "options": [
+    {
+      "id": "r2-obsidian-bronze-tarot",
+      "title": "Обсидиановое Таро и литая бронза",
+      "text": "Правило: тёмный матовый обсидиан пола поглощает фоновый шум; светятся только бронзовые фигуры с тонким золотым контуром, карты-Таро и потоки Эфира. Свет: тёплое янтарное свечение снизу и жёсткий золотой контровой. Форма: резкие барельефные силуэты и тонкие рамки ар-деко. Цвет: угольно-чёрный, матовый сланец, литая бронза, янтарное золото и ледяная бирюза.",
+      "palette": [
+        "#08090b",
+        "#fdfdfd",
+        "#23251f",
+        "#513025",
+        "#2c2f4f",
+        "#151627"
+      ],
+      "tags": [
+        "R2 микс",
+        "Обсидиан + Ар-деко",
+        "тёплый контраст"
+      ],
+      "pros": [
+        "максимальная цельность кадра и мгновенная читаемость карт на тёмном столе",
+        "минимум текстур для быстрого 3D"
+      ],
+      "cons": [
+        "акцент Перегрузки (красный) нужно строго дозировать, чтобы не потерять золотой ритм"
+      ],
+      "media": [
+        {
+          "src": "../../refs/r2-obsidian-bronze-tarot/steam-cd7336e1.jpg",
+          "caption": "Тёмный стол, литой бронзовый медальон и карта Таро в тёплом контровом свете",
+          "source": "https://store.steampowered.com/app/456670/",
+          "credit": "Defiant Development",
+          "license": "© Defiant Development — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-obsidian-bronze-tarot/steam-aa9c9693.jpg",
+          "caption": "Чёрные чернильные силуэты и янтарный факел хода над полем боя",
+          "source": "https://store.steampowered.com/app/1940340/",
+          "credit": "Red Hook Studios",
+          "license": "© Red Hook Studios — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-obsidian-bronze-tarot/steam-05ea09ea.jpg",
+          "caption": "Мощный удар с крупной цифрой урона и резкой золотистой вспышкой на тёмном фоне",
+          "source": "https://store.steampowered.com/app/1940340/",
+          "credit": "Red Hook Studios",
+          "license": "© Red Hook Studios — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-obsidian-bronze-tarot/steam-57771dd3.jpg",
+          "caption": "Тёмный стол дуэли: минимум лишнего фона, только светящиеся слоты и тёплые карты",
+          "source": "https://store.steampowered.com/app/1092790/",
+          "credit": "Daniel Mullins Games",
+          "license": "© Daniel Mullins Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-obsidian-bronze-tarot/steam-928c896d.jpg",
+          "caption": "Тёмные монолитные столбы арены с золотым внутренним свечением",
+          "source": "https://store.steampowered.com/app/1466060/",
+          "credit": "Questline",
+          "license": "© Questline — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-obsidian-bronze-tarot/steam-291ef7c7.jpg",
+          "caption": "Тонкие золотые рамки и геометрические орбиты на экране выбора 1 из 3",
+          "source": "https://store.steampowered.com/app/1755830/",
+          "credit": "Little Leo Games",
+          "license": "© Little Leo Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-obsidian-bronze-tarot/wikimedia-f9ca2f9e.jpg",
+          "caption": "Бронзовый барельеф в каннелированной раме ар-деко — пластика существ без мелкого шума",
+          "source": "https://commons.wikimedia.org/wiki/File:Paul_Jouve._Bas_relief_d%27une_lionne.jpg",
+          "credit": "Dominique Suisse",
+          "license": "CC BY-SA 4.0",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "r2-ether-alchemy-overload",
+      "title": "Кристальный брутализм и Разряд",
+      "text": "Правило: мокрый чёрный базальт с врезанными кристаллами и силовыми шинами; в норме горит холодный циан-кварц, при Перегрузке Канала всё заливает аварийный багровый свет. Свет: отражения на мокром камне, объёмные лучи, резкие тени. Форма: острые кристаллы и монолитные блоки без завитушек. Цвет: мокрый графит, глубокий чёрный, белый кварц, электрический циан и аварийный багровый.",
+      "palette": [
+        "#ffffff",
+        "#292222",
+        "#b93826",
+        "#679793",
+        "#c7a24b",
+        "#946231"
+      ],
+      "tags": [
+        "R2 микс",
+        "Кристалл + Брутализм",
+        "под Перегрузку"
+      ],
+      "pros": [
+        "Перегрузка Канала читается без единого слова UI за счёт смены цвета света и искр",
+        "мощные отражения"
+      ],
+      "cons": [
+        "риск уйти в техногенный sci-fi вместо фэнтези четырёх школ"
+      ],
+      "media": [
+        {
+          "src": "../../refs/r2-ether-alchemy-overload/wikimedia-f3489c34.jpg",
+          "caption": "Кубические чёрные кристаллы флюорита на тёплой янтарной матрице",
+          "source": "https://commons.wikimedia.org/wiki/File:Fluorite_(Crystal_Victory_Mine,_near_Cave-in-Rock,_Illinois,_USA)_2_(34430613991).jpg",
+          "credit": "James St. John",
+          "license": "CC BY 2.0",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-ether-alchemy-overload/steam-54870213.jpg",
+          "caption": "Циановые кольца и след разряда Эфира на тёмном полу арены",
+          "source": "https://store.steampowered.com/app/462770/",
+          "credit": "Supergiant Games",
+          "license": "© Supergiant Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-ether-alchemy-overload/steam-3699b7e3.jpg",
+          "caption": "Столкновение техно-синтета и фэнтези-бойца, тёплое огненное свечение атаки",
+          "source": "https://store.steampowered.com/app/270790/",
+          "credit": "Nival",
+          "license": "© Nival — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-ether-alchemy-overload/wikimedia-1b2c2f7b.jpg",
+          "caption": "Контраст тёмной металлической породы и острых белых кристаллов",
+          "source": "https://commons.wikimedia.org/wiki/File:Tetrahedrite_-_Black_Pine_mine,_Granite_Co.,_Montana,_USA.jpg",
+          "credit": "Ivar Leidus",
+          "license": "CC BY-SA 4.0",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-ether-alchemy-overload/steam-98583559.jpg",
+          "caption": "Яркий бирюзовый энергетический клинок на тёмном фоне и золотые схемы",
+          "source": "https://store.steampowered.com/app/237930/",
+          "credit": "Supergiant Games",
+          "license": "© Supergiant Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-ether-alchemy-overload/steam-4687ad26.jpg",
+          "caption": "Энергетический разряд в руках мага-оператора, отражения на мокром камне",
+          "source": "https://store.steampowered.com/app/3669870/",
+          "credit": "Remedy Entertainment",
+          "license": "© Remedy Entertainment — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-ether-alchemy-overload/steam-7a582a07.jpg",
+          "caption": "Монолитный бетонный зал в аварийном красном свете при перегрузке",
+          "source": "https://store.steampowered.com/app/870780/",
+          "credit": "Remedy Entertainment",
+          "license": "© Remedy Entertainment — moodboard only",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "r2-chromatic-order-chaos",
+      "title": "Хроматическая дуэль Порядка и Хаоса",
+      "text": "Правило: арена дуэли двух демиургов разделена цветовой дуэлью школ — холодный сапфирово-бирюзовый порядок слева против багрово-золотого хаоса справа, связанные живыми нитями Эфира. Свет: двухцветное контровое освещение с разных концов арены. Форма: классический ракурс Etherlords (демиурги по краям, схватка в центре, цифры статов) в чистых золотых рамках. Цвет: тёмный индиго, ночной базальт, сапфировый циан, багровый кармин, латунное золото.",
+      "palette": [
+        "#141214",
+        "#315161",
+        "#615237",
+        "#556e8d",
+        "#5c5d5f",
+        "#96423a"
+      ],
+      "tags": [
+        "R2 микс",
+        "Etherlords + Хроматика",
+        "ракурс 3D-дуэли"
+      ],
+      "pros": [
+        "самый точный дуэльный ракурс под Демиургов и мгновенная читаемость сторон конфликтa"
+      ],
+      "cons": [
+        "требует жёсткой дисциплины палитры, чтобы две стороны не превратились в кашу"
+      ],
+      "media": [
+        {
+          "src": "../../refs/r2-chromatic-order-chaos/steam-87b2e0c6.jpg",
+          "caption": "3D-дуэль с рукой карт внизу и направленным лучом атаки с цифрой HP",
+          "source": "https://store.steampowered.com/app/1803400/",
+          "credit": "Broken Spear Inc.",
+          "license": "© Broken Spear Inc. — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-chromatic-order-chaos/steam-b6e63e43.jpg",
+          "caption": "Симметричная дуэль сапфирового и огненного демиургов с картами внизу и статами",
+          "source": "https://store.steampowered.com/app/397060/",
+          "credit": "Abrakam Entertainment SA",
+          "license": "© Abrakam Entertainment SA — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-chromatic-order-chaos/steam-74343fc4.jpg",
+          "caption": "Ракурс дуэли: два демиурга по краям, схватка существ в центре, цифры статов над фигурами",
+          "source": "https://store.steampowered.com/app/270790/",
+          "credit": "Nival",
+          "license": "© Nival — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-chromatic-order-chaos/steam-00f9647c.jpg",
+          "caption": "Бой от третьего лица с рукой карт, светящимся щитом и тёмным фоном арены",
+          "source": "https://store.steampowered.com/app/1199030/",
+          "credit": "Questline",
+          "license": "© Questline — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-chromatic-order-chaos/steam-928c896d.jpg",
+          "caption": "Тёмные монолитные столбы арены с золотым внутренним свечением",
+          "source": "https://store.steampowered.com/app/1466060/",
+          "credit": "Questline",
+          "license": "© Questline — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/r2-chromatic-order-chaos/steam-9f86771e.jpg",
+          "caption": "Симметричная дуэль двух школ: холодный порядок против багрового хаоса, золотые рамки",
+          "source": "https://store.steampowered.com/app/1755830/",
+          "credit": "Little Leo Games",
+          "license": "© Little Leo Games — moodboard only",
+          "generated": false
+        }
+      ]
+    }
+  ]
+}

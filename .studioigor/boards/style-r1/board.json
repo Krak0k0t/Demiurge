@@ -1,0 +1,286 @@
+{
+  "title": "Стиль — Раунд 1",
+  "subtitle": "Дуэль Демиургов: 4 визуальных направления",
+  "question": "Какое направление ближе? Отметьте кадры «Нравится» / «Не то» и выберите стиль",
+  "mode": "single",
+  "options": [
+    {
+      "id": "crystal-nival",
+      "title": "Кристальное техно-фэнтези (дух Nival)",
+      "text": "Правило: школа меняет цвет кристаллической арены, а Канал Эфира виден как живая нить от демиурга к существам. Свет: холодные сумерки и тёплая бронза. Форма: гранёные кристаллы и рунические пьедесталы. Цвет: базальтово-синий, бронза, акценты 4 школ.",
+      "palette": [],
+      "tags": [
+        "3D",
+        "близко к референсу",
+        "Three.js"
+      ],
+      "pros": [
+        "мгновенно узнаётся атмосфера Etherlords",
+        "высокая читаемость школ по цвету"
+      ],
+      "cons": [
+        "легко скатиться в обычное фэнтези без строгой геометрии света"
+      ],
+      "media": [
+        {
+          "src": "../../refs/crystal-nival/steam-74343fc4.jpg",
+          "caption": "Ракурс дуэли: два демиурга по краям, схватка существ в центре, цифры статов над фигурами",
+          "source": "https://store.steampowered.com/app/270790/",
+          "credit": "Nival",
+          "license": "© Nival — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/crystal-nival/steam-5a2ad227.jpg",
+          "caption": "Читаемость заклинаний: яркие световые дуги и рунические круги под ногами существ",
+          "source": "https://store.steampowered.com/app/270790/",
+          "credit": "Nival",
+          "license": "© Nival — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/crystal-nival/steam-3699b7e3.jpg",
+          "caption": "Столкновение техно-синтета и фэнтези-бойца, тёплое огненное свечение атаки",
+          "source": "https://store.steampowered.com/app/270790/",
+          "credit": "Nival",
+          "license": "© Nival — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/crystal-nival/steam-b1cd2995.jpg",
+          "caption": "Каменные пьедесталы с бирюзовыми рунами и кристальными обелисками",
+          "source": "https://store.steampowered.com/app/270790/",
+          "credit": "Nival",
+          "license": "© Nival — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/crystal-nival/wikimedia-c050d97b.jpg",
+          "caption": "Огранка прозрачного кварца и радужные преломления граней на тёмном фоне",
+          "source": "https://commons.wikimedia.org/wiki/File:Quartz,_Tibet.jpg",
+          "credit": "JJ Harrison (https://www.jjharrison.com.au/)",
+          "license": "CC BY-SA 2.5",
+          "generated": false
+        },
+        {
+          "src": "../../refs/crystal-nival/wikimedia-1b2c2f7b.jpg",
+          "caption": "Контраст тёмной металлической породы и острых белых кристаллов",
+          "source": "https://commons.wikimedia.org/wiki/File:Tetrahedrite_-_Black_Pine_mine,_Granite_Co.,_Montana,_USA.jpg",
+          "credit": "Ivar Leidus",
+          "license": "CC BY-SA 4.0",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "obsidian-ink",
+      "title": "Обсидиан и жидкое золото (смелое)",
+      "text": "Правило: всё поле и тела существ — тёмный матовый обсидиан; светятся только Эфир, контуры (rim light) и трещины перегрузки. Свет: жёсткий контровой. Форма: монолитные резкие силуэты без мелкого шума.",
+      "palette": [],
+      "tags": [
+        "3D",
+        "высокий контраст",
+        "минимум текстур"
+      ],
+      "pros": [
+        "невероятная читаемость за 1 секунду и дешёвый рендер в браузере"
+      ],
+      "cons": [
+        "мрачная палитра требует аккуратного контраста карт"
+      ],
+      "media": [
+        {
+          "src": "../../refs/obsidian-ink/steam-57771dd3.jpg",
+          "caption": "Тёмный стол дуэли: минимум лишнего фона, только светящиеся слоты и тёплые карты",
+          "source": "https://store.steampowered.com/app/1092790/",
+          "credit": "Daniel Mullins Games",
+          "license": "© Daniel Mullins Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/obsidian-ink/steam-c8c721fd.jpg",
+          "caption": "Силуэт соперника растворён во тьме — видны лишь светящиеся глаза и знаки",
+          "source": "https://store.steampowered.com/app/1092790/",
+          "credit": "Daniel Mullins Games",
+          "license": "© Daniel Mullins Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/obsidian-ink/steam-928c896d.jpg",
+          "caption": "Тёмные монолитные столбы арены с золотым внутренним свечением",
+          "source": "https://store.steampowered.com/app/1466060/",
+          "credit": "Questline",
+          "license": "© Questline — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/obsidian-ink/wikimedia-43660368.jpg",
+          "caption": "Глубокий чёрный обсидиан с тёплыми медно-золотыми прожилками",
+          "source": "https://commons.wikimedia.org/wiki/File:Black_obsidian_with_streaks_of_mahogany_obsidian.jpg",
+          "credit": "James St. John",
+          "license": "CC BY 2.0",
+          "generated": false
+        },
+        {
+          "src": "../../refs/obsidian-ink/wikimedia-5d9986a9.jpg",
+          "caption": "Острый раковистый скол тёмного стекла для форм пьедесталов",
+          "source": "https://commons.wikimedia.org/wiki/File:Obsidian_44.jpg",
+          "credit": "James St. John",
+          "license": "CC BY 2.0",
+          "generated": false
+        },
+        {
+          "src": "../../refs/obsidian-ink/steam-00f9647c.jpg",
+          "caption": "Бой от третьего лица с рукой карт, светящимся щитом и тёмным фоном арены",
+          "source": "https://store.steampowered.com/app/1199030/",
+          "credit": "Questline",
+          "license": "© Questline — moodboard only",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "artdeco-tarot",
+      "title": "Монументальный ар-деко и витражное Таро (из другого медиа)",
+      "text": "Правило: арена как ожившая золотая гравюра ар-деко — симметричные арки, лучевые нимбы и чёткие силуэты существ. Свет: тёплое витражное свечение и латунь. Форма: ступенчатая симметрия и тонкие рамки.",
+      "palette": [],
+      "tags": [
+        "3D/2.5D",
+        "стилизовано",
+        "ар-деко"
+      ],
+      "pros": [
+        "уникальный авторский облик среди карточных игр",
+        "идеально сочетается с UI карт"
+      ],
+      "cons": [
+        "меньше индустриального техно-налёта оригинальных Синтетов"
+      ],
+      "media": [
+        {
+          "src": "../../refs/artdeco-tarot/steam-162b1d7a.jpg",
+          "caption": "Плоские цветные карты с чёткой геометрией иконок на тёмно-зелёном сукне",
+          "source": "https://store.steampowered.com/app/718670/",
+          "credit": "Weather Factory",
+          "license": "© Weather Factory — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/artdeco-tarot/steam-9f86771e.jpg",
+          "caption": "Симметричная дуэль двух школ: холодный порядок против багрового хаоса, золотые рамки",
+          "source": "https://store.steampowered.com/app/1755830/",
+          "credit": "Little Leo Games",
+          "license": "© Little Leo Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/artdeco-tarot/steam-291ef7c7.jpg",
+          "caption": "Тонкие золотые рамки и геометрические орбиты на экране выбора 1 из 3",
+          "source": "https://store.steampowered.com/app/1755830/",
+          "credit": "Little Leo Games",
+          "license": "© Little Leo Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/artdeco-tarot/steam-e11d3eef.jpg",
+          "caption": "Астрономические кольца и резкие контуры фигур на стилизованной арене",
+          "source": "https://store.steampowered.com/app/1755830/",
+          "credit": "Little Leo Games",
+          "license": "© Little Leo Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/artdeco-tarot/wikimedia-250d6670.jpg",
+          "caption": "Свинцовые переплёты и цветные стёкла витражной геометрии",
+          "source": "https://commons.wikimedia.org/wiki/File:Geometric_Grisaille_c.1200-1250_-_Stained_Glass_Museum.jpg",
+          "credit": "The wub",
+          "license": "CC0",
+          "generated": false
+        },
+        {
+          "src": "../../refs/artdeco-tarot/wikimedia-f9ca2f9e.jpg",
+          "caption": "Бронзовый барельеф в каннелированной раме ар-деко — пластика существ без мелкого шума",
+          "source": "https://commons.wikimedia.org/wiki/File:Paul_Jouve._Bas_relief_d%27une_lionne.jpg",
+          "credit": "Dominique Suisse",
+          "license": "CC BY-SA 4.0",
+          "generated": false
+        }
+      ]
+    },
+    {
+      "id": "brutalist-cyber-alchemy",
+      "title": "Бруталистская алхимия Синтетов (под Перегрузку)",
+      "text": "Правило: Эфир подаётся по силовым шинам и кольцам-конденсаторам, которые физически раскаляются и искрят при перегрузке Канала. Свет: жёсткие тени, бетон и объёмные лучи.",
+      "palette": [],
+      "tags": [
+        "3D",
+        "техно-фэнтези",
+        "под механику"
+      ],
+      "pros": [
+        "лучше всего визуализирует риск Перегрузки Эфирного Канала"
+      ],
+      "cons": [
+        "ближе к sci-fi, нужно удержать магическую природу школ"
+      ],
+      "media": [
+        {
+          "src": "../../refs/brutalist-cyber-alchemy/steam-1fdf6557.jpg",
+          "caption": "Изометрия арены со светящимися колоннами, кибер-сеткой и красной печатью",
+          "source": "https://store.steampowered.com/app/237930/",
+          "credit": "Supergiant Games",
+          "license": "© Supergiant Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/brutalist-cyber-alchemy/steam-98583559.jpg",
+          "caption": "Яркий бирюзовый энергетический клинок на тёмном фоне и золотые схемы",
+          "source": "https://store.steampowered.com/app/237930/",
+          "credit": "Supergiant Games",
+          "license": "© Supergiant Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/brutalist-cyber-alchemy/steam-1916e041.jpg",
+          "caption": "Холодные акценты интерфейса на фоне приглушённого камня",
+          "source": "https://store.steampowered.com/app/237930/",
+          "credit": "Supergiant Games",
+          "license": "© Supergiant Games — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/brutalist-cyber-alchemy/steam-4687ad26.jpg",
+          "caption": "Энергетический разряд в руках мага-оператора, отражения на мокром камне",
+          "source": "https://store.steampowered.com/app/3669870/",
+          "credit": "Remedy Entertainment",
+          "license": "© Remedy Entertainment — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/brutalist-cyber-alchemy/steam-a5779156.jpg",
+          "caption": "Электрический синий разлом и разлёт каменных осколков при ударе",
+          "source": "https://store.steampowered.com/app/870780/",
+          "credit": "Remedy Entertainment",
+          "license": "© Remedy Entertainment — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/brutalist-cyber-alchemy/steam-7a582a07.jpg",
+          "caption": "Монолитный бетонный зал в аварийном красном свете при перегрузке",
+          "source": "https://store.steampowered.com/app/870780/",
+          "credit": "Remedy Entertainment",
+          "license": "© Remedy Entertainment — moodboard only",
+          "generated": false
+        },
+        {
+          "src": "../../refs/brutalist-cyber-alchemy/wikimedia-4f3676ac.jpg",
+          "caption": "Диагональные бетонные плоскости и жёсткие тени брутализма",
+          "source": "https://commons.wikimedia.org/wiki/File:Brutalist_Architecture_(181685065).jpeg",
+          "credit": "Henrique Lima",
+          "license": "CC BY 3.0",
+          "generated": false
+        }
+      ]
+    }
+  ]
+}

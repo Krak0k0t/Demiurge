@@ -1,0 +1,127 @@
+{
+  "title": "Хроматическая дуэль Порядка и Хаоса",
+  "text": "Правило: арена дуэли двух демиургов разделена цветовой дуэлью школ — холодный сапфирово-бирюзовый порядок слева против багрово-золотого хаоса справа, связанные живыми нитями Эфира. Свет: двухцветное контровое освещение с разных концов арены. Форма: классический ракурс Etherlords (демиурги по краям, схватка в центре, цифры статов) в чистых золотых рамках. Цвет: тёмный индиго, ночной базальт, сапфировый циан, багровый кармин, латунное золото.",
+  "palette": [
+    "#141214",
+    "#315161",
+    "#615237",
+    "#556e8d",
+    "#5c5d5f",
+    "#96423a"
+  ],
+  "tags": [
+    "R2 микс",
+    "Etherlords + Хроматика",
+    "ракурс 3D-дуэли"
+  ],
+  "items": [
+    {
+      "file": "steam-87b2e0c6.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1803400/ss_fcfbfe6b22f7680856d88ba0378a966fb9ddfffc.1920x1080.jpg?t=1739198900",
+      "page": "https://store.steampowered.com/app/1803400/",
+      "title": "Beneath Oresa — screenshot 2",
+      "credit": "Broken Spear Inc.",
+      "license": "© Broken Spear Inc. — moodboard only",
+      "api": "steam",
+      "query": "Beneath Oresa",
+      "generated": false,
+      "note": "3D-дуэль с рукой карт внизу и направленным лучом атаки с цифрой HP",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "87b2e0c6ec221c0e491909689458239bf90bc9cc"
+    },
+    {
+      "file": "steam-b6e63e43.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/397060/ss_b6e63e433787861222a7feeaf617fb5d9c36efd1.1920x1080.jpg?t=1773309610",
+      "page": "https://store.steampowered.com/app/397060/",
+      "title": "Faeria — screenshot 1",
+      "credit": "Abrakam Entertainment SA",
+      "license": "© Abrakam Entertainment SA — moodboard only",
+      "api": "steam",
+      "query": "Faeria",
+      "generated": false,
+      "note": "Симметричная дуэль сапфирового и огненного демиургов с картами внизу и статами",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "b6e63e433787861222a7feeaf617fb5d9c36efd1"
+    },
+    {
+      "file": "steam-74343fc4.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/270790/ss_74343fc48021ed2c79fd1f895eed2cf73f82d05e.1920x1080.jpg?t=1570706747",
+      "page": "https://store.steampowered.com/app/270790/",
+      "title": "Etherlords II — screenshot 1",
+      "credit": "Nival",
+      "license": "© Nival — moodboard only",
+      "api": "steam",
+      "query": "Etherlords II",
+      "generated": false,
+      "note": "Ракурс дуэли: два демиурга по краям, схватка существ в центре, цифры статов над фигурами",
+      "w": 1280,
+      "h": 720,
+      "sha1": "74343fc48021ed2c79fd1f895eed2cf73f82d05e"
+    },
+    {
+      "file": "steam-00f9647c.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1199030/ss_338a18da2f82060ab2e22adf11cfd0395209fb2a.1920x1080.jpg?t=1748103885",
+      "page": "https://store.steampowered.com/app/1199030/",
+      "title": "Tainted Grail: Conquest — screenshot 1",
+      "credit": "Questline",
+      "license": "© Questline — moodboard only",
+      "api": "steam",
+      "query": "Tainted Grail: Conquest",
+      "generated": false,
+      "note": "Бой от третьего лица с рукой карт, светящимся щитом и тёмным фоном арены",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "00f9647ce3579943783645912203068bc15ebf0d"
+    },
+    {
+      "file": "steam-928c896d.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1466060/9c00e471d2cb0690a3f2b0959dc64593ef0e1eb8/ss_9c00e471d2cb0690a3f2b0959dc64593ef0e1eb8.1920x1080.jpg?t=1793295003",
+      "page": "https://store.steampowered.com/app/1466060/",
+      "title": "Tainted Grail: The Fall of Avalon — screenshot 1",
+      "credit": "Questline",
+      "license": "© Questline — moodboard only",
+      "api": "steam",
+      "query": "Tainted Grail: The Fall of Avalon",
+      "generated": false,
+      "note": "Тёмные монолитные столбы арены с золотым внутренним свечением",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "928c896daba962c42adfdfdfb9fd242c17ee709f"
+    },
+    {
+      "file": "steam-9f86771e.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1755830/ss_e8fbb9e4419623b9cb30804da44781b668b09d6b.1920x1080.jpg?t=1791216369",
+      "page": "https://store.steampowered.com/app/1755830/",
+      "title": "Astrea: Six-Sided Oracles — screenshot 1",
+      "credit": "Little Leo Games",
+      "license": "© Little Leo Games — moodboard only",
+      "api": "steam",
+      "query": "Astrea: Six-Sided Oracles",
+      "generated": false,
+      "note": "Симметричная дуэль двух школ: холодный порядок против багрового хаоса, золотые рамки",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "9f86771e4960d11a21fa2aee9c9e5971fcfd7395"
+    }
+  ],
+  "pros": [
+    "самый точный дуэльный ракурс под Демиургов и мгновенная читаемость сторон конфликтa"
+  ],
+  "cons": [
+    "требует жёсткой дисциплины палитры, чтобы две стороны не превратились в кашу"
+  ],
+  "dropped": [
+    {
+      "file": "steam-54c248be.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1803400/ss_94c863bc78dcfc375934ef08718a4478fac2a5ae.1920x1080.jpg?t=1739198900",
+      "sha1": "54c248be7dcfc5cc7e20cb42b42d95d1b216a86f"
+    },
+    {
+      "file": "steam-4d807bac.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/397060/ss_4d807bace6b1cfd4b2dd8b39703ed5b66306f596.1920x1080.jpg?t=1773309610",
+      "sha1": "4d807bace6b1cfd4b2dd8b39703ed5b66306f596"
+    }
+  ]
+}

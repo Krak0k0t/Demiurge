@@ -1,0 +1,138 @@
+{
+  "title": "Обсидиановое Таро и литая бронза",
+  "text": "Правило: тёмный матовый обсидиан пола поглощает фоновый шум; светятся только бронзовые фигуры с тонким золотым контуром, карты-Таро и потоки Эфира. Свет: тёплое янтарное свечение снизу и жёсткий золотой контровой. Форма: резкие барельефные силуэты и тонкие рамки ар-деко. Цвет: угольно-чёрный, матовый сланец, литая бронза, янтарное золото и ледяная бирюза.",
+  "palette": [
+    "#08090b",
+    "#fdfdfd",
+    "#23251f",
+    "#513025",
+    "#2c2f4f",
+    "#151627"
+  ],
+  "tags": [
+    "R2 микс",
+    "Обсидиан + Ар-деко",
+    "тёплый контраст"
+  ],
+  "items": [
+    {
+      "file": "steam-cd7336e1.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/456670/ss_27b01129a6ad12e3af9f11a8dfe09ea90b868c37.1920x1080.jpg?t=1768889222",
+      "page": "https://store.steampowered.com/app/456670/",
+      "title": "Hand of Fate 2 — screenshot 2",
+      "credit": "Defiant Development",
+      "license": "© Defiant Development — moodboard only",
+      "api": "steam",
+      "query": "Hand of Fate 2",
+      "generated": false,
+      "note": "Тёмный стол, литой бронзовый медальон и карта Таро в тёплом контровом свете",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "cd7336e16077ffcad094f43069a6d40bce72c5eb"
+    },
+    {
+      "file": "steam-aa9c9693.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1940340/ss_bc4c7aec5704ed4108a181ec9a790c3fea4a9f12.1920x1080.jpg?t=1759351183",
+      "page": "https://store.steampowered.com/app/1940340/",
+      "title": "Darkest Dungeon® II — screenshot 1",
+      "credit": "Red Hook Studios",
+      "license": "© Red Hook Studios — moodboard only",
+      "api": "steam",
+      "query": "Darkest Dungeon® II",
+      "generated": false,
+      "note": "Чёрные чернильные силуэты и янтарный факел хода над полем боя",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "aa9c9693fc7f24ce455f92313e1562fef809a110"
+    },
+    {
+      "file": "steam-05ea09ea.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1940340/ss_254e72f3356e62496b02c1faf7852bb5053e0338.1920x1080.jpg?t=1759351183",
+      "page": "https://store.steampowered.com/app/1940340/",
+      "title": "Darkest Dungeon® II — screenshot 2",
+      "credit": "Red Hook Studios",
+      "license": "© Red Hook Studios — moodboard only",
+      "api": "steam",
+      "query": "Darkest Dungeon® II",
+      "generated": false,
+      "note": "Мощный удар с крупной цифрой урона и резкой золотистой вспышкой на тёмном фоне",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "05ea09ea3872f228a4cca82fa8167b38d0eb292f"
+    },
+    {
+      "file": "steam-57771dd3.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1092790/ss_0191a69b0e94a9a7784f5b81e27f06379910645a.1920x1080.jpg?t=1777572925",
+      "page": "https://store.steampowered.com/app/1092790/",
+      "title": "Inscryption — screenshot 1",
+      "credit": "Daniel Mullins Games",
+      "license": "© Daniel Mullins Games — moodboard only",
+      "api": "steam",
+      "query": "Inscryption",
+      "generated": false,
+      "note": "Тёмный стол дуэли: минимум лишнего фона, только светящиеся слоты и тёплые карты",
+      "w": 1920,
+      "h": 1079,
+      "sha1": "57771dd387273ff0f2750383a92116e345d07472"
+    },
+    {
+      "file": "steam-928c896d.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1466060/9c00e471d2cb0690a3f2b0959dc64593ef0e1eb8/ss_9c00e471d2cb0690a3f2b0959dc64593ef0e1eb8.1920x1080.jpg?t=1793295003",
+      "page": "https://store.steampowered.com/app/1466060/",
+      "title": "Tainted Grail: The Fall of Avalon — screenshot 1",
+      "credit": "Questline",
+      "license": "© Questline — moodboard only",
+      "api": "steam",
+      "query": "Tainted Grail: The Fall of Avalon",
+      "generated": false,
+      "note": "Тёмные монолитные столбы арены с золотым внутренним свечением",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "928c896daba962c42adfdfdfb9fd242c17ee709f"
+    },
+    {
+      "file": "steam-291ef7c7.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1755830/ss_461aac10b4f898c2584c7a8acf0c7a6986bc6cb2.1920x1080.jpg?t=1791216369",
+      "page": "https://store.steampowered.com/app/1755830/",
+      "title": "Astrea: Six-Sided Oracles — screenshot 2",
+      "credit": "Little Leo Games",
+      "license": "© Little Leo Games — moodboard only",
+      "api": "steam",
+      "query": "Astrea: Six-Sided Oracles",
+      "generated": false,
+      "note": "Тонкие золотые рамки и геометрические орбиты на экране выбора 1 из 3",
+      "w": 1920,
+      "h": 1080,
+      "sha1": "291ef7c7b2e511f61fb7cd958a845be7b126043a"
+    },
+    {
+      "file": "wikimedia-f9ca2f9e.jpg",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b9/Paul_Jouve._Bas_relief_d%27une_lionne.jpg/1280px-Paul_Jouve._Bas_relief_d%27une_lionne.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "page": "https://commons.wikimedia.org/wiki/File:Paul_Jouve._Bas_relief_d%27une_lionne.jpg",
+      "title": "Paul Jouve. Bas relief d'une lionne",
+      "credit": "Dominique Suisse",
+      "license": "CC BY-SA 4.0",
+      "api": "wikimedia",
+      "query": "Art Deco relief bronze",
+      "generated": false,
+      "note": "Бронзовый барельеф в каннелированной раме ар-деко — пластика существ без мелкого шума",
+      "w": 1280,
+      "h": 859,
+      "sha1": "f9ca2f9e4d4ebdab6ce9a6e951ed60d015130018"
+    }
+  ],
+  "pros": [
+    "максимальная цельность кадра и мгновенная читаемость карт на тёмном столе",
+    "минимум текстур для быстрого 3D"
+  ],
+  "cons": [
+    "акцент Перегрузки (красный) нужно строго дозировать, чтобы не потерять золотой ритм"
+  ],
+  "dropped": [
+    {
+      "file": "steam-5f9c1001.jpg",
+      "url": "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/456670/ss_6021ebd05883fc2c72de41ae8cba8815b2f41373.1920x1080.jpg?t=1768889222",
+      "sha1": "5f9c10012fee4629e790497b119ab520d78e35b9"
+    }
+  ]
+}
