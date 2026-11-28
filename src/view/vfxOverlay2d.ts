@@ -107,6 +107,9 @@ export class VfxOverlay2D {
   private targetingArc: TargetingArc | null = null;
 
   private stamps: HTMLCanvasElement[];
+  private vigNormalCanvas: HTMLCanvasElement;
+  private vigOverloadCanvas: HTMLCanvasElement;
+  private vigDirty = true;
   private overload = false;
   private edgePulse = 0;
   private trailTimer = 0;
@@ -118,6 +121,8 @@ export class VfxOverlay2D {
     container.appendChild(this.canvas);
     this.ctx = this.canvas.getContext('2d')!;
     this.stamps = GLOW_COLORS.map(buildGlowStamp);
+    this.vigNormalCanvas = document.createElement('canvas');
+    this.vigOverloadCanvas = document.createElement('canvas');
 
     for (let i = 0; i < PARTICLE_POOL; i++) {
       this.particles.push({
@@ -192,6 +197,34 @@ export class VfxOverlay2D {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
+    this.vigDirty = true;
+  }
+
+  private ensureVignettes(): void {
+    if (!this.vigDirty) return;
+    this.vigDirty = false;
+    const vw = Math.max(64, Math.round(this.width * 0.5));
+    const vh = Math.max(64, Math.round(this.height * 0.5));
+    const paint = (c: HTMLCanvasElement, edgeColor: string) => {
+      c.width = vw;
+      c.height = vh;
+      const vctx = c.getContext('2d');
+      if (!vctx) return;
+      const vig = vctx.createRadialGradient(
+        vw * 0.5,
+        vh * 0.46,
+        Math.min(vw, vh) * 0.28,
+        vw * 0.5,
+        vh * 0.5,
+        Math.max(vw, vh) * 0.74
+      );
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, edgeColor);
+      vctx.fillStyle = vig;
+      vctx.fillRect(0, 0, vw, vh);
+    };
+    paint(this.vigNormalCanvas, 'rgba(8, 7, 16, 0.46)');
+    paint(this.vigOverloadCanvas, 'rgba(88, 18, 14, 0.62)');
   }
 
   public setGraphicsLevel(level: number): void {
@@ -391,16 +424,10 @@ export class VfxOverlay2D {
           continue;
         }
         const ease = 1 - (1 - b.t) * (1 - b.t);
-        const evalBoltPt = (u: number) => {
-          const cu = Math.max(0, Math.min(1, u));
-          return {
-            x: b.sx + (b.tx - b.sx) * cu,
-            y: b.sy + (b.ty - b.sy) * cu - Math.sin(cu * Math.PI) * 46,
-          };
-        };
-
-        const head = evalBoltPt(ease);
-        if (emitBoltTrail) this.spawnTrailMote(head.x, head.y, b.colorIdx, 6);
+        const cuHead = Math.max(0, Math.min(1, ease));
+        const headX = b.sx + (b.tx - b.sx) * cuHead;
+        const headY = b.sy + (b.ty - b.sy) * cuHead - Math.sin(cuHead * Math.PI) * 46;
+        if (emitBoltTrail) this.spawnTrailMote(headX, headY, b.colorIdx, 6);
 
         // Crackling lightning tail ribbon behind projectile head
         const tailStart = Math.max(0, ease - 0.34);
@@ -410,11 +437,12 @@ export class VfxOverlay2D {
         ctx.lineWidth = 4.5;
         ctx.beginPath();
         for (let s = 0; s <= segs; s++) {
-          const u = tailStart + ((ease - tailStart) * s) / segs;
-          const pt = evalBoltPt(u);
+          const cu = Math.max(0, Math.min(1, tailStart + ((ease - tailStart) * s) / segs));
+          const px = b.sx + (b.tx - b.sx) * cu;
+          const py = b.sy + (b.ty - b.sy) * cu - Math.sin(cu * Math.PI) * 46;
           const jitter = s === 0 || s === segs ? 0 : Math.sin(elapsed * 44 + s * 2.9 + i) * 9;
-          if (s === 0) ctx.moveTo(pt.x + jitter, pt.y + jitter * 0.5);
-          else ctx.lineTo(pt.x + jitter, pt.y + jitter * 0.5);
+          if (s === 0) ctx.moveTo(px + jitter, py + jitter * 0.5);
+          else ctx.lineTo(px + jitter, py + jitter * 0.5);
         }
         ctx.stroke();
 
@@ -425,7 +453,7 @@ export class VfxOverlay2D {
 
         const stamp = this.stamps[b.colorIdx];
         ctx.globalAlpha = 0.9;
-        ctx.drawImage(stamp, head.x - 16, head.y - 16, 32, 32);
+        ctx.drawImage(stamp, headX - 16, headY - 16, 32, 32);
       }
 
       for (let i = 0; i < PARTICLE_POOL; i++) {
@@ -549,26 +577,22 @@ export class VfxOverlay2D {
       }
     }
 
-    // 3. Soft Radial Vignette + Overload Edge Embers (skip complex gradients on Low Eco)
+    // 3. Cached Radial Vignette + Overload Edge Embers (zero per-frame gradient allocations)
     if (level >= GRAPHICS_LEVEL.medium) {
-      const vig = ctx.createRadialGradient(
-        this.width * 0.5,
-        this.height * 0.46,
-        Math.min(this.width, this.height) * 0.28,
-        this.width * 0.5,
-        this.height * 0.5,
-        Math.max(this.width, this.height) * 0.74
-      );
-      vig.addColorStop(0, 'rgba(0,0,0,0)');
-      const edgeAlpha = (this.overload ? 0.56 : 0.46) + this.edgePulse;
-      vig.addColorStop(
-        1,
-        this.overload || this.edgePulse > 0.05
-          ? `rgba(88, 18, 14, ${Math.min(0.72, edgeAlpha).toFixed(2)})`
-          : 'rgba(8, 7, 16, 0.48)'
-      );
-      ctx.fillStyle = vig;
-      ctx.fillRect(0, 0, this.width, this.height);
+      this.ensureVignettes();
+      ctx.save();
+      if (this.overload) {
+        ctx.globalAlpha = Math.min(1, 0.92 + this.edgePulse);
+        ctx.drawImage(this.vigOverloadCanvas, 0, 0, this.width, this.height);
+      } else {
+        ctx.globalAlpha = 1;
+        ctx.drawImage(this.vigNormalCanvas, 0, 0, this.width, this.height);
+        if (this.edgePulse > 0.02) {
+          ctx.globalAlpha = Math.min(0.85, this.edgePulse * 2.4);
+          ctx.drawImage(this.vigOverloadCanvas, 0, 0, this.width, this.height);
+        }
+      }
+      ctx.restore();
     }
     if (this.edgePulse > 0) {
       this.edgePulse = Math.max(0, this.edgePulse - safeDt * 1.4);

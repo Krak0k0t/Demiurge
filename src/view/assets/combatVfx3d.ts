@@ -9,11 +9,14 @@ export interface CombatVfx3dHandle {
   spawnGroundShockwave: (pos: THREE.Vector3, school: MagicSchool, maxRadius?: number) => void;
   spawnWeaponSlash3D: (pos: THREE.Vector3, school: MagicSchool, yawAngle?: number, scale?: number) => void;
   spawnSummonPillar: (pos: THREE.Vector3, school: MagicSchool) => void;
+  spawnCreatureVanish3D: (pos: THREE.Vector3, school: MagicSchool) => void;
+  spawnBattleStart3D: (playerPos: THREE.Vector3, enemyPos: THREE.Vector3, school: MagicSchool) => void;
   spawnSpellNova3D: (pos: THREE.Vector3, school: MagicSchool, scale?: number) => void;
   spawnShatterBurst: (pos: THREE.Vector3, school: MagicSchool, count?: number) => void;
   spawnChronoAstrolabe3D: (pos: THREE.Vector3) => void;
   spawnSoulTetherArc3D: (from: THREE.Vector3, to: THREE.Vector3, school: MagicSchool) => void;
   spawnResonanceApotheosis3D: (archonPos: THREE.Vector3, enemyPos: THREE.Vector3, school: MagicSchool) => void;
+  spawnPatternSigil3D: (pos: THREE.Vector3, pattern: 'triangle' | 'star' | 'circle' | 'decoy', school: MagicSchool) => void;
   update: (dt: number) => void;
   dispose: () => void;
 }
@@ -32,6 +35,11 @@ interface ActiveEffect {
   cleanup: () => void;
 }
 
+// Module-level scratch vectors to eliminate per-event/per-frame allocations
+const _vTmpA = new THREE.Vector3();
+const _vTmpB = new THREE.Vector3();
+const _vTmpC = new THREE.Vector3();
+
 export function buildCombatVfx3d(): CombatVfx3dHandle {
   const group = new THREE.Group();
   let currentLevel = getGraphicsLevel();
@@ -44,27 +52,75 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
   const novaSigilGeo = new THREE.RingGeometry(0.54, 0.7, 6);
   novaSigilGeo.rotateX(-Math.PI / 2);
   const slashGeo = new THREE.TorusGeometry(0.8, 0.034, 6, 22, Math.PI * 0.9);
-  const pillarGeo = new THREE.CylinderGeometry(0.4, 0.48, 2.1, 16, 1, true);
+  const pillarGeo = new THREE.CylinderGeometry(0.42, 0.5, 2.2, 16, 1, true);
   const shardGeo = new THREE.OctahedronGeometry(0.09, 0);
   const clockDialGeo = new THREE.RingGeometry(0.62, 0.72, 24);
   clockDialGeo.rotateX(-Math.PI / 2);
   const tetherBeadGeo = new THREE.OctahedronGeometry(0.085, 0);
+  const mandalaGeo = new THREE.RingGeometry(0.46, 0.52, 8);
+  mandalaGeo.rotateX(-Math.PI / 2);
+  const duelSealGeo = new THREE.TorusGeometry(1.05, 0.022, 6, 36);
+  const duelInnerSealGeo = new THREE.TorusGeometry(0.66, 0.016, 6, 6);
 
   const effects: ActiveEffect[] = [];
+  const matPool: THREE.MeshBasicMaterial[] = [];
+  const meshPool: THREE.Mesh[] = [];
 
-  const makeAdditiveMat = (hex: number, opacity = 0.9, doubleSide = false) =>
-    new THREE.MeshStandardMaterial({
-      color: hex,
-      emissive: hex,
-      emissiveIntensity: 1.45,
-      roughness: 0.22,
-      metalness: 0.0,
-      transparent: true,
-      opacity,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
-    });
+  const acquireAdditiveMat = (
+    hex: number,
+    opacity = 0.9,
+    doubleSide = false
+  ): THREE.MeshBasicMaterial => {
+    const mat =
+      matPool.pop() ??
+      new THREE.MeshBasicMaterial({
+        color: hex,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+      });
+    mat.color.setHex(hex);
+    mat.opacity = opacity;
+    const desiredSide = doubleSide ? THREE.DoubleSide : THREE.FrontSide;
+    if (mat.side !== desiredSide) {
+      mat.side = desiredSide;
+      mat.needsUpdate = true;
+    }
+    return mat;
+  };
+
+  const releaseAdditiveMat = (mat: THREE.MeshBasicMaterial | null | undefined) => {
+    if (!mat) return;
+    if (matPool.length < 96) {
+      matPool.push(mat);
+    } else {
+      mat.dispose();
+    }
+  };
+
+  const acquireMesh = (geo: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh => {
+    const mesh = meshPool.pop();
+    if (mesh) {
+      mesh.geometry = geo;
+      mesh.material = mat;
+      mesh.position.set(0, 0, 0);
+      mesh.rotation.set(0, 0, 0);
+      mesh.scale.set(1, 1, 1);
+      mesh.visible = true;
+      return mesh;
+    }
+    return new THREE.Mesh(geo, mat);
+  };
+
+  const releaseMesh = (mesh: THREE.Mesh | null | undefined) => {
+    if (!mesh) return;
+    mesh.removeFromParent();
+    if (meshPool.length < 128) {
+      meshPool.push(mesh);
+    }
+  };
 
   const clearAll = () => {
     for (let i = effects.length - 1; i >= 0; i--) {
@@ -76,16 +132,16 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
   const spawnGroundShockwave = (pos: THREE.Vector3, school: MagicSchool, maxRadius = 2.0) => {
     if (currentLevel <= GRAPHICS_LEVEL.low) return;
     const cols = SCHOOL_HEX[school];
-    const outerMat = makeAdditiveMat(cols.main, 0.88, true);
-    const outerRing = new THREE.Mesh(ringGeo, outerMat);
+    const outerMat = acquireAdditiveMat(cols.main, 0.88, true);
+    const outerRing = acquireMesh(ringGeo, outerMat);
     outerRing.position.set(pos.x, 0.05, pos.z);
     group.add(outerRing);
 
     let innerRing: THREE.Mesh | null = null;
-    let innerMat: THREE.MeshStandardMaterial | null = null;
+    let innerMat: THREE.MeshBasicMaterial | null = null;
     if (currentLevel >= GRAPHICS_LEVEL.ultra) {
-      innerMat = makeAdditiveMat(cols.hot, 0.78, true);
-      innerRing = new THREE.Mesh(ringGeo, innerMat);
+      innerMat = acquireAdditiveMat(cols.hot, 0.78, true);
+      innerRing = acquireMesh(ringGeo, innerMat);
       innerRing.position.set(pos.x, 0.065, pos.z);
       group.add(innerRing);
     }
@@ -104,11 +160,11 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
         }
       },
       cleanup: () => {
-        group.remove(outerRing);
-        outerMat.dispose();
+        releaseMesh(outerRing);
+        releaseAdditiveMat(outerMat);
         if (innerRing && innerMat) {
-          group.remove(innerRing);
-          innerMat.dispose();
+          releaseMesh(innerRing);
+          releaseAdditiveMat(innerMat);
         }
       },
     });
@@ -120,28 +176,30 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
     school: MagicSchool,
     fast = false
   ) => {
+    const pFrom = from.clone();
+    const pTo = to.clone();
     const cols = SCHOOL_HEX[school];
-    const headMat = makeAdditiveMat(cols.hot, 0.95);
-    const head = new THREE.Mesh(orbGeo, headMat);
-    head.position.copy(from);
+    const headMat = acquireAdditiveMat(cols.hot, 0.95);
+    const head = acquireMesh(orbGeo, headMat);
+    head.position.copy(pFrom);
     group.add(head);
 
     let helixOrb: THREE.Mesh | null = null;
-    let helixMat: THREE.MeshStandardMaterial | null = null;
+    let helixMat: THREE.MeshBasicMaterial | null = null;
     if (currentLevel >= GRAPHICS_LEVEL.ultra) {
-      helixMat = makeAdditiveMat(cols.main, 0.9);
-      helixOrb = new THREE.Mesh(shardGeo, helixMat);
-      helixOrb.position.copy(from);
+      helixMat = acquireAdditiveMat(cols.main, 0.9);
+      helixOrb = acquireMesh(shardGeo, helixMat);
+      helixOrb.position.copy(pFrom);
       group.add(helixOrb);
     }
 
-    const trails: Array<{ mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial }> = [];
+    const trails: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }> = [];
     const trailCount = currentLevel >= GRAPHICS_LEVEL.ultra ? 5 : currentLevel >= GRAPHICS_LEVEL.high ? 3 : 1;
     for (let i = 0; i < trailCount; i++) {
-      const tMat = makeAdditiveMat(cols.main, 0.74 - i * 0.12);
-      const tMesh = new THREE.Mesh(trailGeo, tMat);
+      const tMat = acquireAdditiveMat(cols.main, 0.74 - i * 0.12);
+      const tMesh = acquireMesh(trailGeo, tMat);
       tMesh.scale.setScalar(1.3 - i * 0.19);
-      tMesh.position.copy(from);
+      tMesh.position.copy(pFrom);
       group.add(tMesh);
       trails.push({ mesh: tMesh, mat: tMat });
     }
@@ -149,11 +207,10 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
     const duration = fast ? 0.16 : 0.30;
     const evalPos = (u: number, out: THREE.Vector3) => {
       const clamped = Math.max(0, Math.min(1, u));
-      out.lerpVectors(from, to, clamped);
+      out.lerpVectors(pFrom, pTo, clamped);
       out.y += Math.sin(clamped * Math.PI) * 1.15;
     };
 
-    const tmp = new THREE.Vector3();
     effects.push({
       life: 0,
       maxLife: duration,
@@ -176,27 +233,28 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
           helixMat.opacity = 0.9 * fade;
         }
 
-        trails.forEach((tr, idx) => {
-          evalPos(ease - (idx + 1) * 0.075, tmp);
-          tr.mesh.position.copy(tmp);
+        for (let idx = 0; idx < trails.length; idx++) {
+          const tr = trails[idx];
+          evalPos(ease - (idx + 1) * 0.075, _vTmpA);
+          tr.mesh.position.copy(_vTmpA);
           tr.mat.opacity = (0.74 - idx * 0.12) * fade;
-        });
+        }
 
         if (p >= 1) {
-          spawnGroundShockwave(to, school, 1.5);
+          spawnGroundShockwave(pTo, school, 1.5);
         }
       },
       cleanup: () => {
-        group.remove(head);
-        headMat.dispose();
+        releaseMesh(head);
+        releaseAdditiveMat(headMat);
         if (helixOrb && helixMat) {
-          group.remove(helixOrb);
-          helixMat.dispose();
+          releaseMesh(helixOrb);
+          releaseAdditiveMat(helixMat);
         }
-        trails.forEach((t) => {
-          group.remove(t.mesh);
-          t.mat.dispose();
-        });
+        for (let i = 0; i < trails.length; i++) {
+          releaseMesh(trails[i].mesh);
+          releaseAdditiveMat(trails[i].mat);
+        }
       },
     });
   };
@@ -212,16 +270,16 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
     pivot.rotation.x = Math.PI / 2 - 0.32;
     group.add(pivot);
 
-    const outerMat = makeAdditiveMat(cols.main, 0.92, true);
-    const outerMesh = new THREE.Mesh(slashGeo, outerMat);
+    const outerMat = acquireAdditiveMat(cols.main, 0.92, true);
+    const outerMesh = acquireMesh(slashGeo, outerMat);
     outerMesh.scale.setScalar(scale);
     pivot.add(outerMesh);
 
     let innerMesh: THREE.Mesh | null = null;
-    let innerMat: THREE.MeshStandardMaterial | null = null;
+    let innerMat: THREE.MeshBasicMaterial | null = null;
     if (currentLevel >= GRAPHICS_LEVEL.ultra) {
-      innerMat = makeAdditiveMat(cols.hot, 0.95, true);
-      innerMesh = new THREE.Mesh(slashGeo, innerMat);
+      innerMat = acquireAdditiveMat(cols.hot, 0.95, true);
+      innerMesh = acquireMesh(slashGeo, innerMat);
       innerMesh.scale.setScalar(scale * 0.86);
       pivot.add(innerMesh);
     }
@@ -241,34 +299,264 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
         }
       },
       cleanup: () => {
+        releaseMesh(outerMesh);
+        releaseAdditiveMat(outerMat);
+        if (innerMesh && innerMat) {
+          releaseMesh(innerMesh);
+          releaseAdditiveMat(innerMat);
+        }
         group.remove(pivot);
-        outerMat.dispose();
-        if (innerMat) innerMat.dispose();
       },
     });
   };
 
+  /**
+   * Upgraded Creature Appearance: spinning floor mandala, translucent vortex beam,
+   * and counter-rotating ascending helical energy motes.
+   */
   const spawnSummonPillar = (pos: THREE.Vector3, school: MagicSchool) => {
     if (currentLevel < GRAPHICS_LEVEL.high) return;
+    const px = pos.x;
+    const pz = pos.z;
     const cols = SCHOOL_HEX[school];
-    const pilMat = makeAdditiveMat(cols.main, 0.28, true);
-    const pillar = new THREE.Mesh(pillarGeo, pilMat);
-    pillar.position.set(pos.x, 1.05, pos.z);
+
+    const pilMat = acquireAdditiveMat(cols.main, 0.34, true);
+    const pillar = acquireMesh(pillarGeo, pilMat);
+    pillar.position.set(px, 1.1, pz);
     group.add(pillar);
 
-    spawnGroundShockwave(pos, school, 1.65);
+    const mandalaMat = acquireAdditiveMat(cols.hot, 0.82, true);
+    const mandala = acquireMesh(mandalaGeo, mandalaMat);
+    mandala.position.set(px, 0.05, pz);
+    group.add(mandala);
+
+    const helixCount = currentLevel >= GRAPHICS_LEVEL.ultra ? 8 : 4;
+    const helixBeads: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; baseAng: number }> = [];
+    for (let i = 0; i < helixCount; i++) {
+      const mMat = acquireAdditiveMat(i % 2 === 0 ? cols.hot : cols.main, 0.9);
+      const mMesh = acquireMesh(tetherBeadGeo, mMat);
+      mMesh.scale.setScalar(0.8);
+      group.add(mMesh);
+      helixBeads.push({ mesh: mMesh, mat: mMat, baseAng: (i / helixCount) * Math.PI * 2 });
+    }
+
+    spawnGroundShockwave(pos, school, 1.85);
 
     effects.push({
       life: 0,
-      maxLife: 0.38,
+      maxLife: 0.56,
       tick: (p) => {
-        const s = 1 - p * 0.55;
-        pillar.scale.set(s, 0.75 + p * 0.65, s);
-        pilMat.opacity = 0.28 * (1 - p);
+        const ease = 1 - (1 - p) * (1 - p);
+        const s = 1.05 - p * 0.62;
+        pillar.scale.set(s, 0.68 + p * 0.78, s);
+        pillar.rotation.y = p * 3.5;
+        pilMat.opacity = 0.34 * (1 - p);
+
+        mandala.scale.setScalar(0.55 + ease * 1.15);
+        mandala.rotation.y = -p * Math.PI * 2.2;
+        mandalaMat.opacity = 0.82 * (1 - p);
+
+        for (let i = 0; i < helixBeads.length; i++) {
+          const hb = helixBeads[i];
+          const dir = i % 2 === 0 ? 1 : -1;
+          const ang = hb.baseAng + dir * p * Math.PI * 3.2;
+          const rad = 0.58 * (1 - p * 0.55);
+          hb.mesh.position.set(
+            px + Math.cos(ang) * rad,
+            0.08 + ease * 1.75,
+            pz + Math.sin(ang) * rad
+          );
+          hb.mesh.rotation.x += 0.2;
+          hb.mesh.rotation.y += 0.25;
+          hb.mat.opacity = 0.9 * (1 - p);
+        }
       },
       cleanup: () => {
-        group.remove(pillar);
-        pilMat.dispose();
+        releaseMesh(pillar);
+        releaseAdditiveMat(pilMat);
+        releaseMesh(mandala);
+        releaseAdditiveMat(mandalaMat);
+        for (let i = 0; i < helixBeads.length; i++) {
+          releaseMesh(helixBeads[i].mesh);
+          releaseAdditiveMat(helixBeads[i].mat);
+        }
+      },
+    });
+  };
+
+  /**
+   * Dedicated Creature Vanish (Death) VFX: banish mandala implosion, ascending
+   * soul-ash spirit vortex, and crystalline shatter burst.
+   */
+  const spawnCreatureVanish3D = (pos: THREE.Vector3, school: MagicSchool) => {
+    if (currentLevel <= GRAPHICS_LEVEL.low) return;
+    const px = pos.x;
+    const pz = pos.z;
+    const cols = SCHOOL_HEX[school];
+
+    // Imploding banish sigil
+    const sigilMat = acquireAdditiveMat(cols.main, 0.85, true);
+    const sigil = acquireMesh(novaSigilGeo, sigilMat);
+    sigil.position.set(px, 0.06, pz);
+    group.add(sigil);
+
+    // Ascending spirit wisps + outward shards
+    const wispCount = currentLevel >= GRAPHICS_LEVEL.ultra ? 10 : currentLevel >= GRAPHICS_LEVEL.high ? 6 : 4;
+    const wisps: Array<{
+      mesh: THREE.Mesh;
+      mat: THREE.MeshBasicMaterial;
+      ang0: number;
+      rad0: number;
+      speedY: number;
+      spinDir: number;
+    }> = [];
+    for (let i = 0; i < wispCount; i++) {
+      const wMat = acquireAdditiveMat(i % 2 === 0 ? cols.hot : cols.main, 0.92);
+      const wMesh = acquireMesh(shardGeo, wMat);
+      wMesh.scale.setScalar(0.55 + (i % 3) * 0.25);
+      group.add(wMesh);
+      wisps.push({
+        mesh: wMesh,
+        mat: wMat,
+        ang0: (i / wispCount) * Math.PI * 2,
+        rad0: 0.24 + (i % 2) * 0.22,
+        speedY: 1.55 + (i % 3) * 0.45,
+        spinDir: i % 2 === 0 ? 1 : -1,
+      });
+    }
+
+    if (currentLevel >= GRAPHICS_LEVEL.high) {
+      spawnShatterBurst(pos, school, currentLevel >= GRAPHICS_LEVEL.ultra ? 10 : 6);
+    }
+
+    effects.push({
+      life: 0,
+      maxLife: 0.72,
+      tick: (p) => {
+        const ease = 1 - (1 - p) * (1 - p);
+        // Sigil contracts inward as spirit leaves, then vanishes
+        const sigilScale = Math.max(0.05, 1.35 * (1 - ease * 0.85));
+        sigil.scale.setScalar(sigilScale);
+        sigil.rotation.y = p * Math.PI * 2.5;
+        sigilMat.opacity = 0.85 * (1 - p);
+
+        for (let i = 0; i < wisps.length; i++) {
+          const w = wisps[i];
+          const ang = w.ang0 + w.spinDir * p * Math.PI * 2.8;
+          const r = w.rad0 * (1 + Math.sin(p * Math.PI) * 0.55) * (1 - p * 0.35);
+          w.mesh.position.set(
+            px + Math.cos(ang) * r,
+            0.2 + p * w.speedY,
+            pz + Math.sin(ang) * r
+          );
+          w.mesh.rotation.x += 0.18;
+          w.mesh.rotation.y += 0.22;
+          w.mesh.scale.setScalar((0.65 + (1 - p) * 0.35) * (1 - p * 0.45));
+          w.mat.opacity = 0.92 * (1 - p);
+        }
+      },
+      cleanup: () => {
+        releaseMesh(sigil);
+        releaseAdditiveMat(sigilMat);
+        for (let i = 0; i < wisps.length; i++) {
+          releaseMesh(wisps[i].mesh);
+          releaseAdditiveMat(wisps[i].mat);
+        }
+      },
+    });
+  };
+
+  /**
+   * Battle Start Opening Ritual: twin convergent arcane arcs from both Archons' staves
+   * igniting a spinning central Cathedral Duel Seal + arena shockwave + rising sparks.
+   */
+  const spawnBattleStart3D = (playerPos: THREE.Vector3, enemyPos: THREE.Vector3, school: MagicSchool) => {
+    if (currentLevel <= GRAPHICS_LEVEL.low) return;
+    const pFrom = playerPos.clone();
+    const eFrom = enemyPos.clone();
+    _vTmpC.set(0, 1.45, 0);
+    const cols = SCHOOL_HEX[school];
+
+    // Twin convergent ignition bolts toward the center
+    spawnProjectileBeam(pFrom, _vTmpC, school, false);
+    spawnProjectileBeam(eFrom, _vTmpC, 'chaos', false);
+
+    // Central spinning Cathedral Duel Seal
+    const outerMat = acquireAdditiveMat(cols.main, 0.72, true);
+    const outerSeal = acquireMesh(duelSealGeo, outerMat);
+    outerSeal.position.set(0, 1.35, 0);
+    outerSeal.rotation.x = Math.PI / 2;
+    group.add(outerSeal);
+
+    const innerMat = acquireAdditiveMat(0xf4cc68, 0.74, true);
+    const innerSeal = acquireMesh(duelInnerSealGeo, innerMat);
+    innerSeal.position.set(0, 1.35, 0);
+    innerSeal.rotation.x = Math.PI / 2;
+    group.add(innerSeal);
+
+    const hexMat = acquireAdditiveMat(cols.main, 0.62, true);
+    const hexFloor = acquireMesh(mandalaGeo, hexMat);
+    hexFloor.position.set(0, 0.06, 0);
+    group.add(hexFloor);
+
+    const flareCount = currentLevel >= GRAPHICS_LEVEL.ultra ? 12 : 6;
+    const flares: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; ang: number }> = [];
+    for (let i = 0; i < flareCount; i++) {
+      const fMat = acquireAdditiveMat(i % 2 === 0 ? cols.hot : 0xf4cc68, 0.9);
+      const fMesh = acquireMesh(shardGeo, fMat);
+      fMesh.scale.setScalar(0.85);
+      group.add(fMesh);
+      flares.push({ mesh: fMesh, mat: fMat, ang: (i / flareCount) * Math.PI * 2 });
+    }
+
+    spawnGroundShockwave(_vTmpB.set(0, 0.05, 0), school, 5.2);
+
+    effects.push({
+      life: 0,
+      maxLife: 1.05,
+      tick: (p) => {
+        const ignition = Math.min(1, p / 0.28);
+        const fade = p > 0.6 ? 1 - (p - 0.6) / 0.4 : 1;
+        const ease = 1 - (1 - p) * (1 - p);
+
+        const ringScale = 0.35 + ignition * 1.1 + ease * 0.45;
+        outerSeal.scale.setScalar(ringScale);
+        outerSeal.rotation.z = p * Math.PI * 2.2;
+        outerMat.opacity = 0.92 * ignition * fade;
+
+        innerSeal.scale.setScalar(ringScale * 0.92);
+        innerSeal.rotation.z = -p * Math.PI * 3.1;
+        innerMat.opacity = 0.88 * ignition * fade;
+
+        hexFloor.scale.setScalar(0.8 + ease * 4.4);
+        hexFloor.rotation.y = p * Math.PI * 1.4;
+        hexMat.opacity = 0.82 * (1 - p);
+
+        for (let i = 0; i < flares.length; i++) {
+          const fl = flares[i];
+          const a = fl.ang + p * Math.PI * 1.6;
+          const rad = 0.4 + ease * 3.6;
+          fl.mesh.position.set(
+            Math.cos(a) * rad,
+            1.35 + Math.sin(p * Math.PI) * 1.1 + (i % 3) * 0.25,
+            Math.sin(a) * rad
+          );
+          fl.mesh.rotation.x += 0.2;
+          fl.mesh.rotation.y += 0.25;
+          fl.mat.opacity = 0.9 * ignition * fade;
+        }
+      },
+      cleanup: () => {
+        releaseMesh(outerSeal);
+        releaseAdditiveMat(outerMat);
+        releaseMesh(innerSeal);
+        releaseAdditiveMat(innerMat);
+        releaseMesh(hexFloor);
+        releaseAdditiveMat(hexMat);
+        for (let i = 0; i < flares.length; i++) {
+          releaseMesh(flares[i].mesh);
+          releaseAdditiveMat(flares[i].mat);
+        }
       },
     });
   };
@@ -276,16 +564,16 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
   const spawnSpellNova3D = (pos: THREE.Vector3, school: MagicSchool, scale = 1.0) => {
     if (currentLevel < GRAPHICS_LEVEL.high) return;
     const cols = SCHOOL_HEX[school];
-    const outerMat = makeAdditiveMat(cols.main, 0.88, true);
-    const outerSigil = new THREE.Mesh(novaSigilGeo, outerMat);
+    const outerMat = acquireAdditiveMat(cols.main, 0.88, true);
+    const outerSigil = acquireMesh(novaSigilGeo, outerMat);
     outerSigil.position.set(pos.x, Math.max(0.18, pos.y * 0.65), pos.z);
     group.add(outerSigil);
 
     let innerSigil: THREE.Mesh | null = null;
-    let innerMat: THREE.MeshStandardMaterial | null = null;
+    let innerMat: THREE.MeshBasicMaterial | null = null;
     if (currentLevel >= GRAPHICS_LEVEL.ultra) {
-      innerMat = makeAdditiveMat(cols.hot, 0.84, true);
-      innerSigil = new THREE.Mesh(novaSigilGeo, innerMat);
+      innerMat = acquireAdditiveMat(cols.hot, 0.84, true);
+      innerSigil = acquireMesh(novaSigilGeo, innerMat);
       innerSigil.position.set(pos.x, Math.max(0.24, pos.y * 0.65 + 0.08), pos.z);
       innerSigil.rotation.y = Math.PI / 6;
       group.add(innerSigil);
@@ -309,11 +597,11 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
         }
       },
       cleanup: () => {
-        group.remove(outerSigil);
-        outerMat.dispose();
+        releaseMesh(outerSigil);
+        releaseAdditiveMat(outerMat);
         if (innerSigil && innerMat) {
-          group.remove(innerSigil);
-          innerMat.dispose();
+          releaseMesh(innerSigil);
+          releaseAdditiveMat(innerMat);
         }
       },
     });
@@ -325,7 +613,7 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
     const shardCount = currentLevel >= GRAPHICS_LEVEL.ultra ? count : Math.max(5, Math.floor(count * 0.55));
     const shards: Array<{
       mesh: THREE.Mesh;
-      mat: THREE.MeshStandardMaterial;
+      mat: THREE.MeshBasicMaterial;
       vx: number;
       vy: number;
       vz: number;
@@ -336,8 +624,8 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
     for (let i = 0; i < shardCount; i++) {
       const ang = (i / shardCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
       const spd = 1.6 + Math.random() * 2.4;
-      const mat = makeAdditiveMat(i % 2 === 0 ? cols.main : cols.hot, 0.9);
-      const mesh = new THREE.Mesh(shardGeo, mat);
+      const mat = acquireAdditiveMat(i % 2 === 0 ? cols.main : cols.hot, 0.9);
+      const mesh = acquireMesh(shardGeo, mat);
       mesh.position.set(pos.x, pos.y + 0.55, pos.z);
       mesh.scale.setScalar(0.65 + Math.random() * 0.65);
       group.add(mesh);
@@ -370,34 +658,36 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
         }
       },
       cleanup: () => {
-        shards.forEach((sh) => {
-          group.remove(sh.mesh);
-          sh.mat.dispose();
-        });
+        for (let i = 0; i < shards.length; i++) {
+          releaseMesh(shards[i].mesh);
+          releaseAdditiveMat(shards[i].mat);
+        }
       },
     });
   };
 
   const spawnChronoAstrolabe3D = (pos: THREE.Vector3) => {
     if (currentLevel <= GRAPHICS_LEVEL.low) return;
-    const outerMat = makeAdditiveMat(0xf4cc68, 0.9, true);
-    const innerMat = makeAdditiveMat(0x62f2e4, 0.85, true);
-    const outerDial = new THREE.Mesh(clockDialGeo, outerMat);
-    outerDial.position.set(pos.x, 0.12, pos.z);
+    const px = pos.x;
+    const pz = pos.z;
+    const outerMat = acquireAdditiveMat(0xf4cc68, 0.9, true);
+    const innerMat = acquireAdditiveMat(0x62f2e4, 0.85, true);
+    const outerDial = acquireMesh(clockDialGeo, outerMat);
+    outerDial.position.set(px, 0.12, pz);
     group.add(outerDial);
 
-    const innerDial = new THREE.Mesh(novaSigilGeo, innerMat);
-    innerDial.position.set(pos.x, 0.16, pos.z);
+    const innerDial = acquireMesh(novaSigilGeo, innerMat);
+    innerDial.position.set(px, 0.16, pz);
     group.add(innerDial);
 
-    const motes: Array<{ mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial; baseAng: number; radius: number }> = [];
+    const motes: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; baseAng: number; radius: number }> = [];
     const moteCount = currentLevel >= GRAPHICS_LEVEL.ultra ? 8 : 4;
     for (let i = 0; i < moteCount; i++) {
-      const mMat = makeAdditiveMat(i % 2 === 0 ? 0xf4cc68 : 0x62f2e4, 0.88);
-      const mMesh = new THREE.Mesh(shardGeo, mMat);
+      const mMat = acquireAdditiveMat(i % 2 === 0 ? 0xf4cc68 : 0x62f2e4, 0.88);
+      const mMesh = acquireMesh(shardGeo, mMat);
       mMesh.scale.setScalar(0.65);
       const ang = (i / moteCount) * Math.PI * 2;
-      mMesh.position.set(pos.x + Math.cos(ang) * 0.7, 0.15, pos.z + Math.sin(ang) * 0.7);
+      mMesh.position.set(px + Math.cos(ang) * 0.7, 0.15, pz + Math.sin(ang) * 0.7);
       group.add(mMesh);
       motes.push({ mesh: mMesh, mat: mMat, baseAng: ang, radius: 0.65 + (i % 2) * 0.22 });
     }
@@ -407,7 +697,7 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
       maxLife: 0.78,
       tick: (p) => {
         const ease = 1 - (1 - p) * (1 - p);
-        outerDial.rotation.y = -p * Math.PI * 2.5; // counter-clockwise rewind spin
+        outerDial.rotation.y = -p * Math.PI * 2.5;
         outerDial.scale.setScalar(0.75 + ease * 0.85);
         outerDial.position.y = 0.12 + p * 0.38;
         outerMat.opacity = 0.9 * (1 - p);
@@ -421,35 +711,38 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
           const mt = motes[i];
           const ang = mt.baseAng - p * Math.PI * 3.0;
           mt.mesh.position.set(
-            pos.x + Math.cos(ang) * mt.radius * (1 - p * 0.35),
+            px + Math.cos(ang) * mt.radius * (1 - p * 0.35),
             0.15 + p * 1.45,
-            pos.z + Math.sin(ang) * mt.radius * (1 - p * 0.35)
+            pz + Math.sin(ang) * mt.radius * (1 - p * 0.35)
           );
           mt.mesh.rotation.y += 0.2;
           mt.mat.opacity = 0.88 * (1 - p);
         }
       },
       cleanup: () => {
-        group.remove(outerDial, innerDial);
-        outerMat.dispose();
-        innerMat.dispose();
-        motes.forEach((m) => {
-          group.remove(m.mesh);
-          m.mat.dispose();
-        });
+        releaseMesh(outerDial);
+        releaseMesh(innerDial);
+        releaseAdditiveMat(outerMat);
+        releaseAdditiveMat(innerMat);
+        for (let i = 0; i < motes.length; i++) {
+          releaseMesh(motes[i].mesh);
+          releaseAdditiveMat(motes[i].mat);
+        }
       },
     });
   };
 
   const spawnSoulTetherArc3D = (from: THREE.Vector3, to: THREE.Vector3, school: MagicSchool) => {
     if (currentLevel <= GRAPHICS_LEVEL.low) return;
+    const pFrom = from.clone();
+    const pTo = to.clone();
     const cols = SCHOOL_HEX[school];
     const beadCount = currentLevel >= GRAPHICS_LEVEL.ultra ? 11 : currentLevel >= GRAPHICS_LEVEL.high ? 7 : 4;
-    const beads: Array<{ mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial; t: number }> = [];
+    const beads: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; t: number }> = [];
     for (let i = 0; i < beadCount; i++) {
       const t = i / Math.max(1, beadCount - 1);
-      const bMat = makeAdditiveMat(i % 2 === 0 ? cols.main : cols.hot, 0.9);
-      const bMesh = new THREE.Mesh(tetherBeadGeo, bMat);
+      const bMat = acquireAdditiveMat(i % 2 === 0 ? cols.main : cols.hot, 0.9);
+      const bMesh = acquireMesh(tetherBeadGeo, bMat);
       bMesh.scale.setScalar(i === 0 || i === beadCount - 1 ? 1.25 : 0.72);
       group.add(bMesh);
       beads.push({ mesh: bMesh, mat: bMat, t });
@@ -463,7 +756,7 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
         for (let i = 0; i < beads.length; i++) {
           const b = beads[i];
           const u = Math.min(1, b.t * Math.min(1, p * 2.1));
-          b.mesh.position.lerpVectors(from, to, u);
+          b.mesh.position.lerpVectors(pFrom, pTo, u);
           b.mesh.position.y += Math.sin(u * Math.PI) * 0.92;
           b.mesh.rotation.x += 0.18;
           b.mesh.rotation.y += 0.22;
@@ -471,27 +764,50 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
         }
       },
       cleanup: () => {
-        beads.forEach((b) => {
-          group.remove(b.mesh);
-          b.mat.dispose();
-        });
+        for (let i = 0; i < beads.length; i++) {
+          releaseMesh(beads[i].mesh);
+          releaseAdditiveMat(beads[i].mat);
+        }
       },
     });
   };
 
   const spawnResonanceApotheosis3D = (archonPos: THREE.Vector3, enemyPos: THREE.Vector3, school: MagicSchool) => {
     if (currentLevel <= GRAPHICS_LEVEL.low) return;
-    spawnSummonPillar(new THREE.Vector3(archonPos.x, 0.05, archonPos.z), school);
-    spawnSpellNova3D(new THREE.Vector3(archonPos.x, 0.1, archonPos.z), school, 2.05);
-    spawnGroundShockwave(new THREE.Vector3(0, 0.06, 0), school, 4.4);
+    const pArchon = archonPos.clone();
+    const pEnemy = enemyPos.clone();
+    spawnSummonPillar(_vTmpA.set(pArchon.x, 0.05, pArchon.z), school);
+    spawnSpellNova3D(_vTmpA.set(pArchon.x, 0.1, pArchon.z), school, 2.05);
+    spawnGroundShockwave(_vTmpA.set(0, 0.06, 0), school, 4.4);
     if (school === 'chaos' || school === 'synth' || school === 'kinet') {
-      spawnProjectileBeam(archonPos, enemyPos, school, false);
+      spawnProjectileBeam(pArchon, pEnemy, school, false);
       if (currentLevel >= GRAPHICS_LEVEL.high) {
-        spawnSpellNova3D(new THREE.Vector3(enemyPos.x, 0.12, enemyPos.z), school, 1.85);
+        spawnSpellNova3D(_vTmpA.set(pEnemy.x, 0.12, pEnemy.z), school, 1.85);
       }
     }
     if (school === 'vital') {
-      spawnSpellNova3D(new THREE.Vector3(0, 0.12, 1.75), 'vital', 2.2);
+      spawnSpellNova3D(_vTmpA.set(0, 0.12, 1.75), 'vital', 2.2);
+    }
+  };
+
+  const spawnPatternSigil3D = (
+    pos: THREE.Vector3,
+    pattern: 'triangle' | 'star' | 'circle' | 'decoy',
+    school: MagicSchool
+  ) => {
+    if (currentLevel <= GRAPHICS_LEVEL.low) return;
+    if (pattern === 'triangle') {
+      spawnSpellNova3D(pos, school, 1.45);
+      spawnWeaponSlash3D(pos, school, 0, 1.15);
+    } else if (pattern === 'star') {
+      spawnSummonPillar(pos, school);
+      spawnSpellNova3D(pos, school, 1.75);
+    } else if (pattern === 'circle') {
+      spawnGroundShockwave(pos, school, 2.3);
+      spawnSpellNova3D(pos, 'vital', 1.4);
+    } else {
+      spawnChronoAstrolabe3D(pos);
+      spawnGroundShockwave(pos, school, 1.7);
     }
   };
 
@@ -507,11 +823,14 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
     spawnGroundShockwave,
     spawnWeaponSlash3D,
     spawnSummonPillar,
+    spawnCreatureVanish3D,
+    spawnBattleStart3D,
     spawnSpellNova3D,
     spawnShatterBurst,
     spawnChronoAstrolabe3D,
     spawnSoulTetherArc3D,
     spawnResonanceApotheosis3D,
+    spawnPatternSigil3D,
     update: (dt: number) => {
       const safeDt = Math.min(dt, 0.05);
       for (let i = effects.length - 1; i >= 0; i--) {
@@ -527,6 +846,9 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
     },
     dispose: () => {
       clearAll();
+      matPool.forEach((m) => m.dispose());
+      matPool.length = 0;
+      meshPool.length = 0;
       orbGeo.dispose();
       trailGeo.dispose();
       ringGeo.dispose();
@@ -536,6 +858,9 @@ export function buildCombatVfx3d(): CombatVfx3dHandle {
       shardGeo.dispose();
       clockDialGeo.dispose();
       tetherBeadGeo.dispose();
+      mandalaGeo.dispose();
+      duelSealGeo.dispose();
+      duelInnerSealGeo.dispose();
     },
   };
 }

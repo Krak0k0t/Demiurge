@@ -41,8 +41,8 @@ export function createCinematicPipeline(
   }
 ): CinematicPipeline {
   let currentLevel = initialLevel;
-  const baseBloomIntensity = options?.bloomIntensity ?? 0.22;
-  const bloomThreshold = options?.bloomThreshold ?? 1.18;
+  const baseBloomIntensity = options?.bloomIntensity ?? 0.18;
+  const bloomThreshold = options?.bloomThreshold ?? 1.24;
   const dofTarget = new THREE.Vector3(0, 0.85, 0);
 
   if (isSoftwareGl) {
@@ -69,13 +69,13 @@ export function createCinematicPipeline(
 
   const renderPass = new RenderPass(scene, camera);
   const normalPass = new NormalPass(scene, camera, {
-    resolutionScale: 1.0,
+    resolutionScale: 0.65,
   });
 
   const ssaoEffect = new SSAOEffect(camera, normalPass.texture, {
     blendFunction: BlendFunction.MULTIPLY,
-    samples: 16,
-    rings: 7,
+    samples: 10,
+    rings: 4,
     worldDistanceThreshold: 36,
     worldDistanceFalloff: 8,
     worldProximityThreshold: 0.55,
@@ -83,10 +83,10 @@ export function createCinematicPipeline(
     minRadiusScale: 0.15,
     luminanceInfluence: 0.78,
     radius: 0.12,
-    intensity: 0.8,
+    intensity: 0.78,
     bias: 0.032,
     fade: 0.016,
-    resolutionScale: 1.0,
+    resolutionScale: 0.65,
   });
   const ssaoPass = new EffectPass(camera, ssaoEffect);
 
@@ -103,7 +103,7 @@ export function createCinematicPipeline(
     luminanceThreshold: bloomThreshold,
     luminanceSmoothing: 0.1,
     intensity: baseBloomIntensity,
-    radius: 0.42,
+    radius: 0.38,
   });
   const toneMappingEffect = new ToneMappingEffect({
     mode: ToneMappingMode.ACES_FILMIC,
@@ -134,7 +134,7 @@ export function createCinematicPipeline(
     renderPass.enabled = composerActive;
     normalPass.enabled = highOrUltra;
     ssaoPass.enabled = highOrUltra;
-    dofPass.enabled = ultraOnly;
+    dofPass.enabled = false;
     bloomTonePass.enabled = composerActive;
     smaaPass.enabled = highOrUltra;
 

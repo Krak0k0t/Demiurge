@@ -3,6 +3,8 @@ import { getGraphicsDetailTier, type DetailTier } from '../../core/graphicsSetti
 import { createRng } from '../../core/rng';
 import {
   buildNormalMapFromCanvas,
+  createEmbossedLeatherTextures,
+  createMicroScratchTextures,
   createPerlinNormalRoughnessPair,
   Perlin2D,
 } from './proceduralNoise';
@@ -43,6 +45,13 @@ export interface TarotMaterialLibrary {
   cyanEyeMat: THREE.MeshStandardMaterial;
   crimsonEyeMat: THREE.MeshStandardMaterial;
   voidMat: THREE.MeshStandardMaterial;
+  sovereignVelvetMat: THREE.MeshPhysicalMaterial;
+  crimsonSilkMat: THREE.MeshPhysicalMaterial;
+  heroSteelPlateMat: THREE.MeshPhysicalMaterial;
+  heroGoldTrimMat: THREE.MeshPhysicalMaterial;
+  heroArcaneCrystalMat: THREE.MeshPhysicalMaterial;
+  heroGrimoirePageMat: THREE.MeshStandardMaterial;
+  heroVisageMat: THREE.MeshPhysicalMaterial;
   contactTex: THREE.Texture;
   grimoireTex: THREE.CanvasTexture;
   textures: THREE.Texture[];
@@ -619,6 +628,332 @@ export function createContactShadowTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(canvas);
 }
 
+function createSovereignBrocadeTextures(
+  maxAnisotropy: number,
+  seed: number
+): {
+  map: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+} {
+  const perlin = new Perlin2D(seed + 619);
+  const size = 512;
+
+  const colCanvas = document.createElement('canvas');
+  colCanvas.width = size;
+  colCanvas.height = size;
+  const cCtx = colCanvas.getContext('2d')!;
+
+  const bumpCanvas = document.createElement('canvas');
+  bumpCanvas.width = size;
+  bumpCanvas.height = size;
+  const bCtx = bumpCanvas.getContext('2d')!;
+
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = size;
+  roughCanvas.height = size;
+  const rCtx = roughCanvas.getContext('2d')!;
+
+  // Rich midnight-indigo velvet base
+  const grad = cCtx.createLinearGradient(0, 0, size, size);
+  grad.addColorStop(0, '#1e284a');
+  grad.addColorStop(0.5, '#27355f');
+  grad.addColorStop(1, '#1a2342');
+  cCtx.fillStyle = grad;
+  cCtx.fillRect(0, 0, size, size);
+
+  bCtx.fillStyle = '#6c6c6c';
+  bCtx.fillRect(0, 0, size, size);
+
+  rCtx.fillStyle = '#d4d4d4';
+  rCtx.fillRect(0, 0, size, size);
+
+  // Fine velvet twill grain
+  cCtx.strokeStyle = 'rgba(130, 165, 230, 0.08)';
+  bCtx.strokeStyle = 'rgba(128, 128, 128, 0.35)';
+  cCtx.lineWidth = 1;
+  bCtx.lineWidth = 1;
+  for (let i = -size; i < size * 2; i += 6) {
+    cCtx.beginPath();
+    cCtx.moveTo(i, 0);
+    cCtx.lineTo(i + size, size);
+    cCtx.stroke();
+    bCtx.beginPath();
+    bCtx.moveTo(i, 0);
+    bCtx.lineTo(i + size, size);
+    bCtx.stroke();
+  }
+
+  // Woven golden-silk Tarot damask medallions & filigree trellises
+  const cell = 128;
+  for (let gx = 0; gx < size; gx += cell) {
+    for (let gy = 0; gy < size; gy += cell) {
+      const cx = gx + cell * 0.5;
+      const cy = gy + cell * 0.5;
+
+      // Subtle embroidered diamond trellis
+      cCtx.strokeStyle = 'rgba(196, 156, 72, 0.28)';
+      cCtx.lineWidth = 2;
+      bCtx.strokeStyle = '#bcbcbc';
+      bCtx.lineWidth = 2.5;
+      rCtx.strokeStyle = '#6a6a6a';
+      rCtx.lineWidth = 2.5;
+
+      [cCtx, bCtx, rCtx].forEach((ctx) => {
+        ctx.beginPath();
+        ctx.moveTo(cx, gy + 8);
+        ctx.lineTo(gx + cell - 8, cy);
+        ctx.lineTo(cx, gy + cell - 8);
+        ctx.lineTo(gx + 8, cy);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, 24, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      // 8-ray embroidered star core
+      cCtx.strokeStyle = 'rgba(222, 185, 102, 0.42)';
+      cCtx.lineWidth = 1.6;
+      bCtx.strokeStyle = '#dedede';
+      bCtx.lineWidth = 2;
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4;
+        cCtx.beginPath();
+        cCtx.moveTo(cx + Math.cos(a) * 6, cy + Math.sin(a) * 6);
+        cCtx.lineTo(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20);
+        cCtx.stroke();
+
+        bCtx.beginPath();
+        bCtx.moveTo(cx + Math.cos(a) * 6, cy + Math.sin(a) * 6);
+        bCtx.lineTo(cx + Math.cos(a) * 20, cy + Math.sin(a) * 20);
+        bCtx.stroke();
+      }
+    }
+  }
+
+  const map = new THREE.CanvasTexture(colCanvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(2, 2);
+  map.anisotropy = maxAnisotropy;
+
+  const normalMap = buildNormalMapFromCanvas(bumpCanvas, perlin, {
+    strength: 2.6,
+    noiseWeight: 0.32,
+    noiseFreq: 16,
+    maxAnisotropy,
+    repeatX: 2,
+    repeatY: 2,
+  });
+
+  const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+  roughnessMap.wrapS = THREE.RepeatWrapping;
+  roughnessMap.wrapT = THREE.RepeatWrapping;
+  roughnessMap.repeat.set(2, 2);
+  roughnessMap.anisotropy = maxAnisotropy;
+
+  return { map, normalMap, roughnessMap };
+}
+
+function createCrimsonSilkTextures(
+  maxAnisotropy: number,
+  seed: number
+): {
+  map: THREE.CanvasTexture;
+  normalMap: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+} {
+  const perlin = new Perlin2D(seed + 733);
+  const size = 256;
+
+  const colCanvas = document.createElement('canvas');
+  colCanvas.width = size;
+  colCanvas.height = size;
+  const cCtx = colCanvas.getContext('2d')!;
+
+  const bumpCanvas = document.createElement('canvas');
+  bumpCanvas.width = size;
+  bumpCanvas.height = size;
+  const bCtx = bumpCanvas.getContext('2d')!;
+
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = size;
+  roughCanvas.height = size;
+  const rCtx = roughCanvas.getContext('2d')!;
+
+  const grad = cCtx.createLinearGradient(0, 0, 0, size);
+  grad.addColorStop(0, '#781d22');
+  grad.addColorStop(0.5, '#912529');
+  grad.addColorStop(1, '#5e1419');
+  cCtx.fillStyle = grad;
+  cCtx.fillRect(0, 0, size, size);
+
+  bCtx.fillStyle = '#7c7c7c';
+  bCtx.fillRect(0, 0, size, size);
+  rCtx.fillStyle = '#8a8a8a';
+  rCtx.fillRect(0, 0, size, size);
+
+  cCtx.strokeStyle = 'rgba(235, 160, 120, 0.14)';
+  bCtx.strokeStyle = 'rgba(155, 155, 155, 0.35)';
+  cCtx.lineWidth = 1;
+  bCtx.lineWidth = 1;
+  for (let i = 0; i < size; i += 4) {
+    cCtx.beginPath();
+    cCtx.moveTo(0, i);
+    cCtx.lineTo(size, i);
+    cCtx.stroke();
+    bCtx.beginPath();
+    bCtx.moveTo(0, i);
+    bCtx.lineTo(size, i);
+    bCtx.stroke();
+  }
+
+  const map = new THREE.CanvasTexture(colCanvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = THREE.RepeatWrapping;
+  map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(2, 2);
+  map.anisotropy = maxAnisotropy;
+
+  const normalMap = buildNormalMapFromCanvas(bumpCanvas, perlin, {
+    strength: 1.9,
+    noiseWeight: 0.25,
+    noiseFreq: 14,
+    maxAnisotropy,
+    repeatX: 2,
+    repeatY: 2,
+  });
+
+  const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+  roughnessMap.wrapS = THREE.RepeatWrapping;
+  roughnessMap.wrapT = THREE.RepeatWrapping;
+  roughnessMap.repeat.set(2, 2);
+  roughnessMap.anisotropy = maxAnisotropy;
+
+  return { map, normalMap, roughnessMap };
+}
+
+function createDamascusSteelTextures(
+  maxAnisotropy: number,
+  seed: number
+): { normalMap: THREE.CanvasTexture; roughnessMap: THREE.CanvasTexture } {
+  const perlin = new Perlin2D(seed + 827);
+  const size = 256;
+  const bumpCanvas = document.createElement('canvas');
+  bumpCanvas.width = size;
+  bumpCanvas.height = size;
+  const bCtx = bumpCanvas.getContext('2d')!;
+
+  bCtx.fillStyle = '#808080';
+  bCtx.fillRect(0, 0, size, size);
+
+  // Damascus folded wave striations & rivet micro-bevels
+  for (let y = 0; y < size; y += 6) {
+    bCtx.strokeStyle = y % 12 === 0 ? 'rgba(205, 205, 205, 0.4)' : 'rgba(65, 65, 65, 0.35)';
+    bCtx.lineWidth = 1.8;
+    bCtx.beginPath();
+    for (let x = 0; x <= size; x += 16) {
+      const wave = Math.sin(x * 0.05 + y * 0.09) * 3.5;
+      if (x === 0) bCtx.moveTo(x, y + wave);
+      else bCtx.lineTo(x, y + wave);
+    }
+    bCtx.stroke();
+  }
+
+  const normalMap = buildNormalMapFromCanvas(bumpCanvas, perlin, {
+    strength: 1.65,
+    noiseWeight: 0.26,
+    noiseFreq: 10,
+    maxAnisotropy,
+    repeatX: 2,
+    repeatY: 2,
+  });
+
+  const roughnessMap = new THREE.CanvasTexture(bumpCanvas);
+  roughnessMap.wrapS = THREE.RepeatWrapping;
+  roughnessMap.wrapT = THREE.RepeatWrapping;
+  roughnessMap.repeat.set(2, 2);
+  roughnessMap.anisotropy = maxAnisotropy;
+
+  return { normalMap, roughnessMap };
+}
+
+function createIlluminatedGrimoireTexture(maxAnisotropy: number): THREE.CanvasTexture {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+
+  const parchment = ctx.createRadialGradient(size / 2, size / 2, 24, size / 2, size / 2, size * 0.72);
+  parchment.addColorStop(0, '#efe4cc');
+  parchment.addColorStop(0.7, '#dfd0b2');
+  parchment.addColorStop(1, '#bea882');
+  ctx.fillStyle = parchment;
+  ctx.fillRect(0, 0, size, size);
+
+  // Double gold leaf frame
+  ctx.strokeStyle = '#a47936';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(20, 20, size - 40, size - 40);
+  ctx.strokeStyle = '#6f4e22';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(30, 30, size - 60, size - 60);
+
+  // Celestial Tarot Astrolabe sigil
+  const cx = size / 2;
+  const cy = 190;
+  ctx.strokeStyle = '#2d6d68';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 98, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 72, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#9b3428';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3 - Math.PI / 2;
+    const x = cx + Math.cos(a) * 90;
+    const y = cy + Math.sin(a) * 90;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.fillStyle = '#c49c48';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Illuminated drop-cap + calligraphic script lines
+  ctx.fillStyle = '#8e2c22';
+  ctx.fillRect(58, 326, 44, 44);
+  ctx.strokeStyle = '#c49c48';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(58, 326, 44, 44);
+
+  ctx.fillStyle = '#3b2b1d';
+  for (let row = 0; row < 6; row++) {
+    const y = 330 + row * 22;
+    const xStart = row < 3 ? 116 : 58;
+    const w = (size - 58 - xStart) * (row === 5 ? 0.62 : 0.96);
+    ctx.fillRect(xStart, y, w, 4);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = maxAnisotropy;
+  return tex;
+}
+
 export function createTarotMaterialLibrary(
   maxAnisotropy: number,
   seed: number
@@ -631,6 +966,18 @@ export function createTarotMaterialLibrary(
   const brocade = createBrocadeClothTextures(maxAnisotropy, seed);
   const chitin = createChitinScaleTextures(maxAnisotropy, seed);
   const volcanic = createVolcanicFissureTextures(maxAnisotropy, seed);
+  const sovereignBrocade = createSovereignBrocadeTextures(maxAnisotropy, seed);
+  const crimsonSilk = createCrimsonSilkTextures(maxAnisotropy, seed);
+  const damascusSteel = createDamascusSteelTextures(maxAnisotropy, seed);
+  const microScratch = createMicroScratchTextures(seed, {
+    size: 256,
+    scratchCount: 135,
+    maxAnisotropy,
+    repeat: 2,
+    strength: 2.35,
+  });
+  const embossedLeather = createEmbossedLeatherTextures(maxAnisotropy, seed);
+  const illuminatedGrimoireTex = createIlluminatedGrimoireTexture(maxAnisotropy);
 
   // Perlin micro-relief normal+roughness pairs for porcelain, ivory, crystal, void & runes
   const porcelainPair = createPerlinNormalRoughnessPair(seed + 501, {
@@ -719,6 +1066,10 @@ export function createTarotMaterialLibrary(
     roughness: 0.46,
     metalness: 0.78,
     anisotropy: 0.4,
+    clearcoat: 0.14,
+    clearcoatRoughness: 0.3,
+    clearcoatNormalMap: microScratch.clearcoatNormalMap,
+    clearcoatNormalScale: new THREE.Vector2(0.45, 0.45),
   });
 
   const darkBronzeMat = new THREE.MeshPhysicalMaterial({
@@ -729,6 +1080,10 @@ export function createTarotMaterialLibrary(
     roughness: 0.54,
     metalness: 0.72,
     anisotropy: 0.35,
+    clearcoat: 0.12,
+    clearcoatRoughness: 0.34,
+    clearcoatNormalMap: microScratch.clearcoatNormalMap,
+    clearcoatNormalScale: new THREE.Vector2(0.42, 0.42),
   });
 
   const goldMat = new THREE.MeshPhysicalMaterial({
@@ -736,9 +1091,13 @@ export function createTarotMaterialLibrary(
     normalMap: filigree.normalMap,
     normalScale: new THREE.Vector2(0.65, 0.65),
     roughnessMap: filigree.roughnessMap,
-    roughness: 0.38,
+    roughness: 0.36,
     metalness: 0.86,
     anisotropy: 0.44,
+    clearcoat: 0.16,
+    clearcoatRoughness: 0.26,
+    clearcoatNormalMap: microScratch.clearcoatNormalMap,
+    clearcoatNormalScale: new THREE.Vector2(0.42, 0.42),
   });
 
   const bluedSteelMat = new THREE.MeshPhysicalMaterial({
@@ -746,9 +1105,13 @@ export function createTarotMaterialLibrary(
     normalMap: filigree.normalMap,
     normalScale: new THREE.Vector2(0.7, 0.7),
     roughnessMap: filigree.roughnessMap,
-    roughness: 0.38,
+    roughness: 0.36,
     metalness: 0.82,
     anisotropy: 0.42,
+    clearcoat: 0.18,
+    clearcoatRoughness: 0.28,
+    clearcoatNormalMap: microScratch.clearcoatNormalMap,
+    clearcoatNormalScale: new THREE.Vector2(0.45, 0.45),
   });
 
   const crimsonArmorMat = new THREE.MeshPhysicalMaterial({
@@ -799,23 +1162,25 @@ export function createTarotMaterialLibrary(
 
   const agedLeatherMat = new THREE.MeshPhysicalMaterial({
     color: 0x523726,
-    normalMap: chitin.normalMap,
-    normalScale: new THREE.Vector2(0.7, 0.7),
-    roughnessMap: chitin.roughnessMap,
-    roughness: 0.78,
+    normalMap: embossedLeather.normalMap,
+    normalScale: new THREE.Vector2(0.78, 0.78),
+    roughnessMap: embossedLeather.roughnessMap,
+    roughness: 0.76,
     metalness: 0.06,
-    sheen: 0.2,
-    sheenRoughness: 0.78,
-    sheenColor: new THREE.Color(0x7a573d),
+    sheen: 0.24,
+    sheenRoughness: 0.74,
+    sheenColor: new THREE.Color(0x825e42),
   });
 
-  const porcelainMaskMat = new THREE.MeshStandardMaterial({
+  const porcelainMaskMat = new THREE.MeshPhysicalMaterial({
     color: 0xdad0bf,
     normalMap: porcelainPair.normalMap,
     normalScale: new THREE.Vector2(0.42, 0.42),
     roughnessMap: porcelainPair.roughnessMap,
-    roughness: 0.48,
+    roughness: 0.36,
     metalness: 0.06,
+    clearcoat: 0.38,
+    clearcoatRoughness: 0.22,
   });
 
   const boneIvoryMat = new THREE.MeshStandardMaterial({
@@ -941,6 +1306,101 @@ export function createTarotMaterialLibrary(
     metalness: 0.1,
   });
 
+  // Hyper-detailed Sovereign Player Archon PBR materials
+  const sovereignVelvetMat = new THREE.MeshPhysicalMaterial({
+    map: sovereignBrocade.map,
+    normalMap: sovereignBrocade.normalMap,
+    normalScale: new THREE.Vector2(0.95, 0.95),
+    roughnessMap: sovereignBrocade.roughnessMap,
+    color: 0xffffff,
+    roughness: 0.84,
+    metalness: 0.08,
+    sheen: 0.65,
+    sheenRoughness: 0.56,
+    sheenColor: new THREE.Color(0x6f96e8),
+    side: THREE.DoubleSide,
+  });
+
+  const crimsonSilkMat = new THREE.MeshPhysicalMaterial({
+    map: crimsonSilk.map,
+    normalMap: crimsonSilk.normalMap,
+    normalScale: new THREE.Vector2(0.75, 0.75),
+    roughnessMap: crimsonSilk.roughnessMap,
+    color: 0xffffff,
+    roughness: 0.56,
+    metalness: 0.06,
+    sheen: 0.72,
+    sheenRoughness: 0.42,
+    sheenColor: new THREE.Color(0xe66a5a),
+    side: THREE.DoubleSide,
+  });
+
+  const heroSteelPlateMat = new THREE.MeshPhysicalMaterial({
+    color: 0x677993,
+    normalMap: damascusSteel.normalMap,
+    normalScale: new THREE.Vector2(0.95, 0.95),
+    roughnessMap: microScratch.roughnessMap,
+    roughness: 0.25,
+    metalness: 0.9,
+    anisotropy: 0.65,
+    clearcoat: 0.38,
+    clearcoatRoughness: 0.18,
+    clearcoatNormalMap: microScratch.clearcoatNormalMap,
+    clearcoatNormalScale: new THREE.Vector2(0.68, 0.68),
+  });
+
+  const heroGoldTrimMat = new THREE.MeshPhysicalMaterial({
+    color: 0xdeb75c,
+    normalMap: filigree.normalMap,
+    normalScale: new THREE.Vector2(0.84, 0.84),
+    roughnessMap: microScratch.roughnessMap,
+    roughness: 0.22,
+    metalness: 0.94,
+    anisotropy: 0.68,
+    clearcoat: 0.28,
+    clearcoatRoughness: 0.17,
+    clearcoatNormalMap: microScratch.clearcoatNormalMap,
+    clearcoatNormalScale: new THREE.Vector2(0.58, 0.58),
+  });
+
+  const heroArcaneCrystalMat = new THREE.MeshPhysicalMaterial({
+    color: 0x74ebe0,
+    emissive: 0x1e6963,
+    emissiveIntensity: 0.48,
+    normalMap: crystalPair.normalMap,
+    normalScale: new THREE.Vector2(0.76, 0.76),
+    roughnessMap: crystalPair.roughnessMap,
+    roughness: 0.12,
+    metalness: 0.18,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.05,
+    clearcoatNormalMap: microScratch.clearcoatNormalMap,
+    clearcoatNormalScale: new THREE.Vector2(0.3, 0.3),
+    iridescence: 0.96,
+    iridescenceIOR: 1.5,
+  });
+
+  const heroGrimoirePageMat = new THREE.MeshStandardMaterial({
+    map: illuminatedGrimoireTex,
+    normalMap: ivoryPair.normalMap,
+    normalScale: new THREE.Vector2(0.34, 0.34),
+    roughnessMap: ivoryPair.roughnessMap,
+    color: 0xffffff,
+    roughness: 0.68,
+    metalness: 0.04,
+  });
+
+  const heroVisageMat = new THREE.MeshPhysicalMaterial({
+    color: 0xede5d7,
+    normalMap: porcelainPair.normalMap,
+    normalScale: new THREE.Vector2(0.42, 0.42),
+    roughnessMap: porcelainPair.roughnessMap,
+    roughness: 0.3,
+    metalness: 0.07,
+    clearcoat: 0.34,
+    clearcoatRoughness: 0.2,
+  });
+
   let currentDetailTier: DetailTier | null = null;
   const setDetailLevel = (tier: DetailTier) => {
     if (currentDetailTier === tier) return;
@@ -951,14 +1411,39 @@ export function createTarotMaterialLibrary(
     const normFactor = ultra ? 1.05 : rich ? 0.85 : 0.55;
 
     wetBasaltMat.normalScale.set(0.9 * normFactor, 0.9 * normFactor);
-    wetBasaltMat.clearcoat = ultra ? 0.26 : rich ? 0.2 : 0.1;
-    wetBasaltMat.envMapIntensity = envBoost * 0.9;
+    wetBasaltMat.clearcoat = ultra ? 0.34 : rich ? 0.24 : 0.1;
+    wetBasaltMat.clearcoatRoughness = ultra ? 0.34 : rich ? 0.44 : 0.56;
+    wetBasaltMat.envMapIntensity = envBoost * 0.94;
 
     [bronzeMat, darkBronzeMat, goldMat, bluedSteelMat].forEach((m) => {
       m.normalScale.set(0.75 * normFactor, 0.75 * normFactor);
+      m.clearcoatNormalScale.set(0.45 * normFactor, 0.45 * normFactor);
       m.anisotropy = ultra ? 0.45 : rich ? 0.34 : 0.14;
       m.envMapIntensity = envBoost;
     });
+
+    heroSteelPlateMat.normalScale.set(0.82 * normFactor, 0.82 * normFactor);
+    heroSteelPlateMat.clearcoatNormalScale.set(0.58 * normFactor, 0.58 * normFactor);
+    heroSteelPlateMat.anisotropy = ultra ? 0.6 : rich ? 0.44 : 0.18;
+    heroSteelPlateMat.envMapIntensity = envBoost * 1.06;
+
+    heroGoldTrimMat.normalScale.set(0.75 * normFactor, 0.75 * normFactor);
+    heroGoldTrimMat.clearcoatNormalScale.set(0.5 * normFactor, 0.5 * normFactor);
+    heroGoldTrimMat.anisotropy = ultra ? 0.64 : rich ? 0.46 : 0.2;
+    heroGoldTrimMat.envMapIntensity = envBoost * 1.08;
+
+    heroArcaneCrystalMat.iridescence = ultra ? 0.94 : rich ? 0.72 : 0.3;
+    heroArcaneCrystalMat.envMapIntensity = envBoost * 1.12;
+
+    sovereignVelvetMat.normalScale.set(0.95 * normFactor, 0.95 * normFactor);
+    sovereignVelvetMat.sheen = ultra ? 0.68 : rich ? 0.5 : 0.26;
+    sovereignVelvetMat.envMapIntensity = envBoost * 0.88;
+
+    crimsonSilkMat.normalScale.set(0.75 * normFactor, 0.75 * normFactor);
+    crimsonSilkMat.sheen = ultra ? 0.74 : rich ? 0.55 : 0.28;
+    crimsonSilkMat.envMapIntensity = envBoost * 0.92;
+
+    heroVisageMat.envMapIntensity = envBoost;
 
     [obsidianClothMat, royalIndigoClothMat].forEach((m) => {
       m.normalScale.set(0.85 * normFactor, 0.85 * normFactor);
@@ -1010,6 +1495,13 @@ export function createTarotMaterialLibrary(
     cyanEyeMat,
     crimsonEyeMat,
     voidMat,
+    sovereignVelvetMat,
+    crimsonSilkMat,
+    heroSteelPlateMat,
+    heroGoldTrimMat,
+    heroArcaneCrystalMat,
+    heroGrimoirePageMat,
+    heroVisageMat,
   ];
   const textures = [
     basalt.map,
@@ -1019,6 +1511,7 @@ export function createTarotMaterialLibrary(
     stone.normalMap,
     stone.roughnessMap,
     grimoireTex,
+    illuminatedGrimoireTex,
     contact,
     filigree.normalMap,
     filigree.roughnessMap,
@@ -1028,6 +1521,19 @@ export function createTarotMaterialLibrary(
     chitin.roughnessMap,
     volcanic.normalMap,
     volcanic.roughnessMap,
+    sovereignBrocade.map,
+    sovereignBrocade.normalMap,
+    sovereignBrocade.roughnessMap,
+    crimsonSilk.map,
+    crimsonSilk.normalMap,
+    crimsonSilk.roughnessMap,
+    damascusSteel.normalMap,
+    damascusSteel.roughnessMap,
+    microScratch.normalMap,
+    microScratch.roughnessMap,
+    microScratch.clearcoatNormalMap,
+    embossedLeather.normalMap,
+    embossedLeather.roughnessMap,
     porcelainPair.normalMap,
     porcelainPair.roughnessMap,
     ivoryPair.normalMap,
@@ -1063,6 +1569,13 @@ export function createTarotMaterialLibrary(
     cyanEyeMat,
     crimsonEyeMat,
     voidMat,
+    sovereignVelvetMat,
+    crimsonSilkMat,
+    heroSteelPlateMat,
+    heroGoldTrimMat,
+    heroArcaneCrystalMat,
+    heroGrimoirePageMat,
+    heroVisageMat,
     contactTex: contact,
     grimoireTex,
     textures,

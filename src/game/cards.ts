@@ -9,7 +9,13 @@ export type ActiveAbilityId =
   | 'vital_mend_aura'
   | 'chaos_spark'
   | 'synth_shield_forge';
-export type BossPassiveId = 'boss_ember_tithe' | 'boss_rift_sovereign';
+export type BossPassiveId =
+  | 'boss_forged_bulwark'
+  | 'boss_briar_thorns'
+  | 'boss_ember_tithe'
+  | 'boss_astral_blink'
+  | 'boss_clockwork_mend'
+  | 'boss_rift_sovereign';
 
 export type RelicId =
   | 'relic_ether_core'
@@ -428,6 +434,7 @@ export const TOURNAMENT_OPPONENTS: OpponentDef[] = [
     baseHp: 21,
     isBoss: false,
     hasCutscene: false,
+    bossPassive: 'boss_forged_bulwark',
     deck: ['synth_blade', 'synth_construct', 'synth_chrono_smith', 'synth_aether_forge', 'kinet_bolt', 'synth_golem'],
   },
   {
@@ -437,6 +444,7 @@ export const TOURNAMENT_OPPONENTS: OpponentDef[] = [
     baseHp: 23,
     isBoss: false,
     hasCutscene: false,
+    bossPassive: 'boss_briar_thorns',
     deck: ['vital_sprout', 'vital_thorn_druid', 'vital_swarm', 'vital_grove_heart', 'vital_stag', 'kinet_lance'],
   },
   {
@@ -456,7 +464,8 @@ export const TOURNAMENT_OPPONENTS: OpponentDef[] = [
     baseHp: 27,
     isBoss: false,
     hasCutscene: false,
-    deck: ['kinet_sylph', 'kinet_zephyr_monk', 'kinet_lance', 'kinet_vortex', 'kinet_tempest_aura', 'kinet_mirage_ward', 'kinet_bolt', 'synth_golem'],
+    bossPassive: 'boss_astral_blink',
+    deck: ['kinet_zephyr_monk', 'kinet_lance', 'kinet_vortex', 'kinet_tempest_aura', 'kinet_mirage_ward', 'kinet_bolt', 'synth_golem', 'kinet_sylph'].slice().reverse(),
   },
   {
     id: 's6',
@@ -465,6 +474,7 @@ export const TOURNAMENT_OPPONENTS: OpponentDef[] = [
     baseHp: 30,
     isBoss: false,
     hasCutscene: false,
+    bossPassive: 'boss_clockwork_mend',
     deck: ['synth_blade', 'vital_sprout', 'synth_construct', 'synth_golem', 'synth_aether_forge', 'synth_stasis_ward', 'synth_arcane_pulse', 'chaos_discharge'],
   },
   {

@@ -9,14 +9,26 @@ import {
   TOURNAMENT_OPPONENTS,
   type ActiveAbilityId,
   type AnomalyId,
+  type BossPassiveId,
   type CardDef,
   type Difficulty,
   type Keyword,
   type OpponentDef,
   type RelicId,
 } from './cards';
+import type { TrialModifierId } from './cathedralMeta';
+import {
+  computeQuestXpBonus,
+  createInitialQuestCounters,
+  evaluateQuestProgress,
+  generateDuelQuest,
+  type DuelQuestState,
+  type QuestProgressCounters,
+} from './quests';
 
 export type CreatureStance = 'attack' | 'guard';
+export type SlotAftermathKind = 'chaos' | 'poison' | null;
+export type LaneRuneKind = 'aegis' | 'surge' | 'fury';
 
 export interface BoardCreature {
   uid: string;
@@ -98,7 +110,9 @@ export interface CombatLogEntry {
     | 'anomaly'
     | 'chrono'
     | 'tether'
-    | 'resonance';
+    | 'resonance'
+    | 'cross'
+    | 'rune';
   cardId?: string;
   detail: string;
 }
@@ -147,6 +161,18 @@ export interface DuelState {
   forgedCards: Record<string, number>;
   archonRank: number;
   schoolDoctrineUsedThisTurn: boolean;
+  crossSchoolTriggeredThisTurn: boolean;
+  trialModifier: TrialModifierId | null;
+  slotAftermath: {
+    player: SlotAftermathKind[];
+    enemy: SlotAftermathKind[];
+  };
+  laneRunes?: {
+    player: Array<LaneRuneKind | null>;
+    enemy: Array<LaneRuneKind | null>;
+  };
+  activeQuest?: DuelQuestState;
+  questCounters?: QuestProgressCounters;
 
   playerDeck: string[];
   playerDrawPile: string[];
@@ -193,32 +219,43 @@ export interface EffectiveCardStats {
 
 export function getCardEffectiveStats(
   cardId: string,
-  forgedCards: Record<string, number> = {}
+  forgedCards: Record<string, number> = {},
+  trialModifier: TrialModifierId | null = null
 ): EffectiveCardStats {
   const card = CARD_CATALOG[cardId];
   if (!card) {
     return { cost: 0, atk: 0, hp: 0, spellAmount: 0, hpBonus: 0, forgeTier: 0 };
   }
   const forgeTier = Math.max(0, Math.min(2, forgedCards[cardId] ?? 0));
+  const applyTrial = (stats: EffectiveCardStats): EffectiveCardStats => {
+    if (trialModifier === 'frail_pact' && card.type === 'creature') {
+      return {
+        ...stats,
+        cost: Math.max(1, stats.cost - 1),
+        hp: Math.max(1, stats.hp - 1),
+      };
+    }
+    return stats;
+  };
   if (forgeTier === 0) {
-    return {
+    return applyTrial({
       cost: card.cost,
       atk: card.atk ?? 0,
       hp: card.hp ?? 0,
       spellAmount: card.spellEffect?.amount ?? 0,
       hpBonus: card.spellEffect?.hpBonus ?? 0,
       forgeTier: 0,
-    };
+    });
   }
   if (card.type === 'creature') {
-    return {
+    return applyTrial({
       cost: card.cost,
       atk: (card.atk ?? 2) + forgeTier,
       hp: (card.hp ?? 2) + forgeTier,
       spellAmount: 0,
       hpBonus: 0,
       forgeTier,
-    };
+    });
   }
   if (card.type === 'enchantment' || card.type === 'trap') {
     return {
@@ -270,7 +307,7 @@ export function calculateDuelXp(state: DuelState): number {
   const speedBonus = Math.max(0, (10 - state.round) * 12);
   const survivalBonus = Math.max(0, state.playerHp * 3);
   const diffMult = state.difficulty === 'cataclysm' ? 1.3 : state.difficulty === 'archmage' ? 1.15 : 1;
-  return Math.round((80 + stageReward + speedBonus + survivalBonus) * diffMult);
+  return Math.round((80 + stageReward + speedBonus + survivalBonus) * diffMult) + computeQuestXpBonus(state.activeQuest);
 }
 
 export function createDuelState(params: {
@@ -283,6 +320,9 @@ export function createDuelState(params: {
   archonRank?: number;
   maxHpBonus?: number;
   startingResonanceBonus?: number;
+  trialModifier?: TrialModifierId | null;
+  enableLaneRunes?: boolean;
+  enableQuests?: boolean;
   seed?: number;
 }): DuelState {
   const seed = params.seed ?? 1337 + params.stageIndex * 97;
@@ -290,17 +330,22 @@ export function createDuelState(params: {
   const opponent = getOpponentForStage(params.stageIndex);
   const relics = [...(params.relics ?? [])];
   const forgedCards = { ...(params.forgedCards ?? {}) };
+  const trialModifier = params.trialModifier ?? null;
   const archonRank = Math.max(1, params.archonRank ?? 1);
   const rankHpBonus = (archonRank - 1) * 2;
   const rankEtherBonus = archonRank >= 3 ? 1 : 0;
+  const titanBonus = trialModifier === 'titan_vow' ? 6 : 0;
 
-  const playerMaxHp =
+  const playerMaxHp = Math.max(
+    10,
     (params.difficulty === 'apprentice' ? 28 : params.difficulty === 'archmage' ? 25 : 22) +
-    rankHpBonus +
-    (params.maxHpBonus ?? 0);
+      rankHpBonus +
+      titanBonus +
+      (params.maxHpBonus ?? 0)
+  );
   const enemyBonus =
     params.difficulty === 'apprentice' ? -2 : params.difficulty === 'archmage' ? 0 : 4;
-  const enemyMaxHp = Math.max(12, opponent.baseHp + enemyBonus);
+  const enemyMaxHp = Math.max(12, opponent.baseHp + enemyBonus + titanBonus);
 
   const deckSource = params.deck ? [...params.deck] : [...STARTER_DECKS[params.playerSchool]];
   const shuffled = shuffleWithRng(deckSource, rng);
@@ -309,29 +354,31 @@ export function createDuelState(params: {
   const enemyHand = [...opponent.deck.slice(0, 3)];
 
   const baseChannel = params.difficulty === 'apprentice' ? 3 : 2;
-  const startingChannel = baseChannel + (relics.includes('relic_ether_core') ? 1 : 0);
+  const trialEtherBonus = trialModifier === 'ether_tide' ? 1 : 0;
+  const trialResonanceBonus = trialModifier === 'ether_tide' ? 1 : 0;
+  const startingChannel = baseChannel + (relics.includes('relic_ether_core') ? 1 : 0) + trialEtherBonus;
   const startingEther = startingChannel + rankEtherBonus;
 
   // Guarantee at least one playable card in opening hand so Round 1 never bricks
   const hasOpeningPlay = playerHand.some(
-    (id) => getCardEffectiveStats(id, forgedCards).cost <= startingEther
+    (id) => getCardEffectiveStats(id, forgedCards, trialModifier).cost <= startingEther
   );
   if (!hasOpeningPlay) {
     const cheapIdx = shuffled.findIndex((id) => {
       const c = CARD_CATALOG[id];
-      const effCost = getCardEffectiveStats(id, forgedCards).cost;
+      const effCost = getCardEffectiveStats(id, forgedCards, trialModifier).cost;
       return c && effCost <= startingEther && c.type === 'creature';
     });
     const fallbackIdx =
       cheapIdx >= 0
         ? cheapIdx
-        : shuffled.findIndex((id) => getCardEffectiveStats(id, forgedCards).cost <= startingEther);
+        : shuffled.findIndex((id) => getCardEffectiveStats(id, forgedCards, trialModifier).cost <= startingEther);
     if (fallbackIdx >= 0 && playerHand.length > 0) {
       let maxIdx = 0;
       for (let i = 1; i < playerHand.length; i++) {
         if (
-          getCardEffectiveStats(playerHand[i], forgedCards).cost >
-          getCardEffectiveStats(playerHand[maxIdx], forgedCards).cost
+          getCardEffectiveStats(playerHand[i], forgedCards, trialModifier).cost >
+          getCardEffectiveStats(playerHand[maxIdx], forgedCards, trialModifier).cost
         ) {
           maxIdx = i;
         }
@@ -367,13 +414,13 @@ export function createDuelState(params: {
     soulTetherActive: false,
     soulTetherCooldown: 0,
     soulTetherLane: null,
-    playerResonance: Math.min(5, Math.max(0, params.startingResonanceBonus ?? 0)),
+    playerResonance: Math.min(5, Math.max(0, (params.startingResonanceBonus ?? 0) + trialResonanceBonus)),
     chaosBurnLanes: [0, 0, 0, 0],
 
     enemyHp: enemyMaxHp,
     enemyMaxHp,
-    enemyEther: 2,
-    enemyChannel: 2,
+    enemyEther: 2 + trialEtherBonus,
+    enemyChannel: 2 + trialEtherBonus,
     enemyOverloaded: false,
 
     playerEnchantment: null,
@@ -386,6 +433,37 @@ export function createDuelState(params: {
     forgedCards,
     archonRank,
     schoolDoctrineUsedThisTurn: false,
+    crossSchoolTriggeredThisTurn: false,
+    trialModifier,
+    slotAftermath: {
+      player: [null, null, null, null],
+      enemy: [null, null, null, null],
+    },
+    ...(params.enableLaneRunes
+      ? (() => {
+          const runePool: LaneRuneKind[] = ['aegis', 'surge', 'fury'];
+          const rRng = createRng(seed + 311);
+          const laneA = Math.floor(rRng.next() * LANES) % LANES;
+          const laneB = (laneA + 1 + Math.floor(rRng.next() * (LANES - 1))) % LANES;
+          const pRunes: Array<LaneRuneKind | null> = [null, null, null, null];
+          const firstIdx = Math.floor(rRng.next() * runePool.length) % runePool.length;
+          const secondIdx = (firstIdx + 1 + Math.floor(rRng.next() * 2)) % runePool.length;
+          pRunes[laneA] = runePool[firstIdx];
+          pRunes[laneB] = runePool[secondIdx];
+          return {
+            laneRunes: {
+              player: pRunes,
+              enemy: [null, null, null, null] as Array<LaneRuneKind | null>,
+            },
+          };
+        })()
+      : {}),
+    ...(params.enableQuests
+      ? {
+          activeQuest: generateDuelQuest(params.stageIndex, params.playerSchool, seed),
+          questCounters: createInitialQuestCounters(),
+        }
+      : {}),
 
     playerDeck: deckSource,
     playerDrawPile: shuffled,
@@ -402,6 +480,26 @@ export function createDuelState(params: {
     lastAiSummary: null,
     combatLog: [],
     pendingEvents: [],
+  };
+}
+
+function withQuestEvaluation(
+  next: DuelState,
+  delta?: Partial<QuestProgressCounters>
+): DuelState {
+  if (!next.activeQuest) return next;
+  const prevCounters = next.questCounters ?? createInitialQuestCounters();
+  const nextCounters: QuestProgressCounters = {
+    summoned: prevCounters.summoned + (delta?.summoned ?? 0),
+    spells: prevCounters.spells + (delta?.spells ?? 0),
+    shields: prevCounters.shields + (delta?.shields ?? 0),
+    resonanceUsed: prevCounters.resonanceUsed + (delta?.resonanceUsed ?? 0),
+  };
+  const updatedQuest = evaluateQuestProgress(next.activeQuest, nextCounters, next);
+  return {
+    ...next,
+    questCounters: nextCounters,
+    activeQuest: updatedQuest,
   };
 }
 
@@ -1005,20 +1103,23 @@ export function triggerCreatureAbility(
     events.push({ type: 'ability', side: 'player', lane: tIdx, uid: targetAlly.uid, school: 'synth', label: '+1/+1 & SHIELD' });
   }
 
-  return {
-    ...next,
-    playerBoard: nextPlayerBoard,
-    enemyBoard: nextEnemyBoard,
-    phase: next.enemyHp <= 0 ? 'victory' : next.phase,
-    combatLog: appendLog(next.combatLog, {
-      round: next.round,
-      actor: 'player',
-      kind: 'spell',
-      cardId: unit.cardId,
-      detail: unit.activeAbility,
-    }),
-    pendingEvents: events,
-  };
+  return withQuestEvaluation(
+    {
+      ...next,
+      playerBoard: nextPlayerBoard,
+      enemyBoard: nextEnemyBoard,
+      phase: next.enemyHp <= 0 ? 'victory' : next.phase,
+      combatLog: appendLog(next.combatLog, {
+        round: next.round,
+        actor: 'player',
+        kind: 'spell',
+        cardId: unit.cardId,
+        detail: unit.activeAbility,
+      }),
+      pendingEvents: events,
+    },
+    { shields: unit.activeAbility === 'synth_shield_forge' ? 1 : 0 }
+  );
 }
 
 export function triggerRightClickLeap(state: DuelState, targetLane?: number): DuelState {
@@ -1050,13 +1151,16 @@ export function triggerRightClickLeap(state: DuelState, targetLane?: number): Du
     });
   }
 
-  return {
-    ...state,
-    playerBoard: nextBoard,
-    leapUsedThisTurn: true,
-    mulliganDone: true,
-    pendingEvents: events,
-  };
+  return withQuestEvaluation(
+    {
+      ...state,
+      playerBoard: nextBoard,
+      leapUsedThisTurn: true,
+      mulliganDone: true,
+      pendingEvents: events,
+    },
+    { shields: chosenIdx >= 0 ? 1 : 0 }
+  );
 }
 
 export function triggerChronoRewind(state: DuelState): DuelState {
@@ -1175,32 +1279,35 @@ export function triggerSoulTether(state: DuelState, preferredLane?: number): Due
     nextPlayerHp = Math.min(state.playerMaxHp, state.playerHp + 1);
   }
 
-  return {
-    ...state,
-    playerHp: nextPlayerHp,
-    playerBoard: nextBoard,
-    soulTetherActive: true,
-    soulTetherCooldown: 2,
-    soulTetherLane: chosenLane >= 0 ? chosenLane : null,
-    mulliganDone: true,
-    combatLog: appendLog(state.combatLog, {
-      round: state.round,
-      actor: 'player',
-      kind: 'tether',
-      detail: detailLabel,
-    }),
-    pendingEvents: [
-      ...state.pendingEvents,
-      {
-        type: 'soul_tether',
-        side: 'player',
-        lane: chosenLane >= 0 ? chosenLane : undefined,
-        uid,
-        school: state.playerSchool,
-        label: 'TETHER 50%',
-      },
-    ],
-  };
+  return withQuestEvaluation(
+    {
+      ...state,
+      playerHp: nextPlayerHp,
+      playerBoard: nextBoard,
+      soulTetherActive: true,
+      soulTetherCooldown: 2,
+      soulTetherLane: chosenLane >= 0 ? chosenLane : null,
+      mulliganDone: true,
+      combatLog: appendLog(state.combatLog, {
+        round: state.round,
+        actor: 'player',
+        kind: 'tether',
+        detail: detailLabel,
+      }),
+      pendingEvents: [
+        ...state.pendingEvents,
+        {
+          type: 'soul_tether',
+          side: 'player',
+          lane: chosenLane >= 0 ? chosenLane : undefined,
+          uid,
+          school: state.playerSchool,
+          label: 'TETHER 50%',
+        },
+      ],
+    },
+    { shields: chosenLane >= 0 ? 1 : 0 }
+  );
 }
 
 export function triggerResonanceApotheosis(state: DuelState): DuelState {
@@ -1222,6 +1329,7 @@ export function triggerResonanceApotheosis(state: DuelState): DuelState {
     playerSchool: next.playerSchool,
     lastLostAlly: next.lastLostAlly,
   };
+  const nextAftermath = cloneSlotAftermath(state.slotAftermath);
 
   let burstLabel = 'APOTHEOSIS';
   if (state.playerSchool === 'kinet') {
@@ -1295,6 +1403,7 @@ export function triggerResonanceApotheosis(state: DuelState): DuelState {
       if (foe.hp <= 0) {
         events.push({ type: 'creature_died', side: 'enemy', lane: i, uid: foe.uid });
         nextEnemyBoard[i] = null;
+        nextAftermath.enemy[i] = 'chaos';
         applyCreatureDeathPassives('enemy', passiveTrack, events, foe, i);
       }
     }
@@ -1324,23 +1433,27 @@ export function triggerResonanceApotheosis(state: DuelState): DuelState {
     label: burstLabel,
   });
 
-  return {
-    ...next,
-    playerHp: passiveTrack.playerHp,
-    enemyHp: passiveTrack.enemyHp,
-    damageDealtTotal: passiveTrack.damageDealtTotal,
-    lastLostAlly: passiveTrack.lastLostAlly,
-    playerBoard: nextPlayerBoard,
-    enemyBoard: nextEnemyBoard,
-    phase: passiveTrack.enemyHp <= 0 ? 'victory' : next.phase,
-    combatLog: appendLog(next.combatLog, {
-      round: next.round,
-      actor: 'player',
-      kind: 'resonance',
-      detail: burstLabel,
-    }),
-    pendingEvents: events,
-  };
+  return withQuestEvaluation(
+    {
+      ...next,
+      playerHp: passiveTrack.playerHp,
+      enemyHp: passiveTrack.enemyHp,
+      damageDealtTotal: passiveTrack.damageDealtTotal,
+      lastLostAlly: passiveTrack.lastLostAlly,
+      playerBoard: nextPlayerBoard,
+      enemyBoard: nextEnemyBoard,
+      slotAftermath: nextAftermath,
+      phase: passiveTrack.enemyHp <= 0 ? 'victory' : next.phase,
+      combatLog: appendLog(next.combatLog, {
+        round: next.round,
+        actor: 'player',
+        kind: 'resonance',
+        detail: burstLabel,
+      }),
+      pendingEvents: events,
+    },
+    { resonanceUsed: 1 }
+  );
 }
 
 function maybeTriggerEnemyTrapOnPlayerAction(
@@ -1401,6 +1514,87 @@ function maybeTriggerEnemyTrapOnPlayerAction(
   return false;
 }
 
+function cloneSlotAftermath(aftermath?: {
+  player: SlotAftermathKind[];
+  enemy: SlotAftermathKind[];
+}): { player: SlotAftermathKind[]; enemy: SlotAftermathKind[] } {
+  return {
+    player: aftermath?.player ? [...aftermath.player] : [null, null, null, null],
+    enemy: aftermath?.enemy ? [...aftermath.enemy] : [null, null, null, null],
+  };
+}
+
+function applyCrossSchoolSpark(
+  state: DuelState,
+  cardSchool: MagicSchool,
+  nextPlayerBoard: Array<BoardCreature | null>,
+  nextEnemyBoard: Array<BoardCreature | null>,
+  aftermath: { player: SlotAftermathKind[]; enemy: SlotAftermathKind[] },
+  events: CombatEvent[],
+  log: CombatLogEntry[]
+): { log: CombatLogEntry[]; triggered: boolean } {
+  if (state.crossSchoolTriggeredThisTurn || cardSchool === state.playerSchool) {
+    return { log, triggered: false };
+  }
+  if (cardSchool === 'kinet') {
+    state.playerResonance = Math.min(5, state.playerResonance + 1);
+    state.playerEther += 1;
+    events.push({ type: 'leap_pulse', side: 'player', school: 'kinet', label: '+1⚡ +RES' });
+  } else if (cardSchool === 'vital') {
+    state.playerHp = Math.min(state.playerMaxHp, state.playerHp + 2);
+    events.push({ type: 'hit_demiurge', side: 'player', school: 'vital', amount: -2, label: '+2 HP' });
+  } else if (cardSchool === 'chaos') {
+    const enemyIdx = nextEnemyBoard.findIndex((c) => c !== null);
+    if (enemyIdx >= 0 && nextEnemyBoard[enemyIdx]) {
+      const foe = nextEnemyBoard[enemyIdx]!;
+      foe.hp -= 1;
+      state.damageDealtTotal += 1;
+      events.push({ type: 'spell', side: 'player', lane: enemyIdx, uid: foe.uid, school: 'chaos', amount: 1, label: '-1 🔥' });
+      if (foe.hp <= 0) {
+        events.push({ type: 'creature_died', side: 'enemy', lane: enemyIdx, uid: foe.uid });
+        nextEnemyBoard[enemyIdx] = null;
+        aftermath.enemy[enemyIdx] = 'chaos';
+        applyCreatureDeathPassives('enemy', state, events, foe, enemyIdx);
+      }
+    } else {
+      state.enemyHp = Math.max(0, state.enemyHp - 1);
+      state.damageDealtTotal += 1;
+      events.push({ type: 'hit_demiurge', side: 'enemy', school: 'chaos', amount: 1, label: '-1 🔥' });
+    }
+  } else {
+    let weakestIdx = -1;
+    let lowestHp = Infinity;
+    for (let i = 0; i < LANES; i++) {
+      const ally = nextPlayerBoard[i];
+      if (ally && ally.hp < lowestHp) {
+        lowestHp = ally.hp;
+        weakestIdx = i;
+      }
+    }
+    if (weakestIdx >= 0 && nextPlayerBoard[weakestIdx]) {
+      nextPlayerBoard[weakestIdx]!.shielded = true;
+      events.push({
+        type: 'leap_pulse',
+        side: 'player',
+        lane: weakestIdx,
+        uid: nextPlayerBoard[weakestIdx]!.uid,
+        school: 'synth',
+        label: 'SHIELD',
+      });
+    } else {
+      state.playerHp = Math.min(state.playerMaxHp, state.playerHp + 1);
+      events.push({ type: 'hit_demiurge', side: 'player', school: 'synth', amount: -1, label: '+1 HP' });
+    }
+  }
+  const nextLog = appendLog(log, {
+    round: state.round,
+    actor: 'player',
+    kind: 'cross',
+    detail: cardSchool.toUpperCase(),
+  });
+  return { log: nextLog, triggered: true };
+}
+
 export function fuseCreatureFromHand(
   state: DuelState,
   handIndex: number,
@@ -1413,7 +1607,9 @@ export function fuseCreatureFromHand(
 
   const cardId = state.playerHand[handIndex];
   const card = cardId ? CARD_CATALOG[cardId] : undefined;
-  const effStats = cardId ? getCardEffectiveStats(cardId, state.forgedCards) : undefined;
+  const effStats = cardId
+    ? getCardEffectiveStats(cardId, state.forgedCards, state.trialModifier)
+    : undefined;
   if (!card || !effStats || card.type !== 'creature' || state.playerEther < effStats.cost) return state;
 
   let next = { ...state };
@@ -1421,6 +1617,7 @@ export function fuseCreatureFromHand(
   const events: CombatEvent[] = [...state.pendingEvents];
   const nextPlayerBoard = cloneBoard(state.playerBoard);
   const nextEnemyBoard = cloneBoard(state.enemyBoard);
+  const nextAftermath = cloneSlotAftermath(state.slotAftermath);
   const fused = nextPlayerBoard[targetLane]!;
 
   const atkGain = Math.max(1, Math.ceil(effStats.atk * 0.75));
@@ -1461,7 +1658,17 @@ export function fuseCreatureFromHand(
 
   maybeTriggerEnemyTrapOnPlayerAction(next, 'summon', targetLane, nextPlayerBoard, nextEnemyBoard, events);
 
-  let nextLog = appendLog(state.combatLog, {
+  const crossRes = applyCrossSchoolSpark(
+    next,
+    card.school,
+    nextPlayerBoard,
+    nextEnemyBoard,
+    nextAftermath,
+    events,
+    state.combatLog
+  );
+
+  let nextLog = appendLog(crossRes.log, {
     round: state.round,
     actor: 'player',
     kind: 'ascend',
@@ -1472,13 +1679,15 @@ export function fuseCreatureFromHand(
 
   next.playerBoard = nextPlayerBoard;
   next.enemyBoard = nextEnemyBoard;
+  next.slotAftermath = nextAftermath;
+  if (crossRes.triggered) next.crossSchoolTriggeredThisTurn = true;
   next.playerEther -= effStats.cost;
   next.playerHand = state.playerHand.filter((_, i) => i !== handIndex);
   next.mulliganDone = true;
-  next.playerResonance = Math.min(5, state.playerResonance + 1);
+  next.playerResonance = Math.min(5, next.playerResonance + 1);
   next.combatLog = nextLog;
   next.pendingEvents = events;
-  return next;
+  return withQuestEvaluation(next, { summoned: 1, shields: 1 });
 }
 
 export function playCardFromHand(
@@ -1492,7 +1701,7 @@ export function playCardFromHand(
   const cardId = state.playerHand[handIndex];
   if (!cardId) return state;
   const card: CardDef | undefined = CARD_CATALOG[cardId];
-  const effStats = getCardEffectiveStats(cardId, state.forgedCards);
+  const effStats = getCardEffectiveStats(cardId, state.forgedCards, state.trialModifier);
   if (!card || state.playerEther < effStats.cost) return state;
 
   let next = { ...state };
@@ -1500,6 +1709,10 @@ export function playCardFromHand(
   const events: CombatEvent[] = [...state.pendingEvents];
   const nextEnemyBoard = cloneBoard(state.enemyBoard);
   const nextPlayerBoard = cloneBoard(state.playerBoard);
+  const nextAftermath = cloneSlotAftermath(state.slotAftermath);
+
+  let runeLogEntry: Omit<CombatLogEntry, 'id'> | null = null;
+  let shieldsGrantedCount = 0;
 
   if (card.type === 'creature') {
     const lane =
@@ -1513,8 +1726,8 @@ export function playCardFromHand(
     const crestBonus = next.relics.includes('relic_veteran_crest') ? 1 : 0;
     const bastionHpBonus = state.anomaly === 'bastion' ? 1 : 0;
 
-    const baseAtk = effStats.atk + flyingBonus + tempestBonus + crestBonus;
-    const baseHp = effStats.hp + bastionHpBonus + tempestBonus + crestBonus;
+    let baseAtk = effStats.atk + flyingBonus + tempestBonus + crestBonus;
+    let baseHp = effStats.hp + bastionHpBonus + tempestBonus + crestBonus;
     const uid = `u${state.nextUid}`;
 
     const grantDoctrineShield =
@@ -1524,6 +1737,35 @@ export function playCardFromHand(
     if (grantDoctrineShield) {
       next.schoolDoctrineUsedThisTurn = true;
     }
+
+    const activeRune = next.laneRunes?.player[lane] ?? null;
+    let runeShield = false;
+    if (activeRune && next.laneRunes) {
+      next.laneRunes = {
+        player: [...next.laneRunes.player],
+        enemy: [...next.laneRunes.enemy],
+      };
+      next.laneRunes.player[lane] = null;
+      if (activeRune === 'aegis') {
+        runeShield = true;
+        baseHp += 1;
+      } else if (activeRune === 'surge') {
+        next.playerEther += 1;
+        next.playerResonance = Math.min(5, next.playerResonance + 1);
+      } else if (activeRune === 'fury') {
+        baseAtk += 2;
+      }
+      runeLogEntry = {
+        round: next.round,
+        actor: 'player',
+        kind: 'rune',
+        cardId: card.id,
+        detail: activeRune.toUpperCase(),
+      };
+    }
+
+    const enteredShielded = grantDoctrineShield || runeShield;
+    if (enteredShielded) shieldsGrantedCount += 1;
 
     nextPlayerBoard[lane] = {
       uid,
@@ -1536,7 +1778,7 @@ export function playCardFromHand(
       maxHp: baseHp,
       keywords: [...card.keywords],
       veteranCount: effStats.forgeTier,
-      shielded: grantDoctrineShield,
+      shielded: enteredShielded,
       summonSick: false,
       stance: 'attack',
       activeAbility: card.activeAbility,
@@ -1554,6 +1796,14 @@ export function playCardFromHand(
       school: card.school,
       label: `${baseAtk}/${baseHp}`,
     });
+
+    if (activeRune === 'aegis') {
+      events.push({ type: 'leap_pulse', side: 'player', lane, uid, school: card.school, label: 'RUNE: AEGIS +0/+1' });
+    } else if (activeRune === 'surge') {
+      events.push({ type: 'leap_pulse', side: 'player', lane, uid, school: card.school, label: 'RUNE: +1⚡ +RES' });
+    } else if (activeRune === 'fury') {
+      events.push({ type: 'veteran', side: 'player', lane, uid, school: card.school, label: 'RUNE: FURY +2 ATK' });
+    }
 
     if (card.keywords.includes('heal')) {
       next.playerHp = Math.min(next.playerMaxHp, next.playerHp + 2);
@@ -1624,6 +1874,7 @@ export function playCardFromHand(
           if (target.hp <= 0) {
             events.push({ type: 'creature_died', side: 'enemy', lane: targetLane, uid: target.uid });
             nextEnemyBoard[targetLane] = null;
+            if (card.school === 'chaos') nextAftermath.enemy[targetLane] = 'chaos';
             applyCreatureDeathPassives('enemy', next, events, target, targetLane);
           }
           next.damageDealtTotal += appliedDmg;
@@ -1664,6 +1915,7 @@ export function playCardFromHand(
           if (t.hp <= 0) {
             events.push({ type: 'creature_died', side: 'enemy', lane: i, uid: t.uid });
             nextEnemyBoard[i] = null;
+            if (card.school === 'chaos') nextAftermath.enemy[i] = 'chaos';
             applyCreatureDeathPassives('enemy', next, events, t, i);
           }
         }
@@ -1727,13 +1979,28 @@ export function playCardFromHand(
     next.playerBoard = nextPlayerBoard;
   }
 
-  let nextLog = appendLog(next.combatLog, {
+  const crossRes = applyCrossSchoolSpark(
+    next,
+    card.school,
+    nextPlayerBoard,
+    nextEnemyBoard,
+    nextAftermath,
+    events,
+    next.combatLog
+  );
+  if (crossRes.triggered) next.crossSchoolTriggeredThisTurn = true;
+  next.slotAftermath = nextAftermath;
+
+  let nextLog = appendLog(crossRes.log, {
     round: next.round,
     actor: 'player',
     kind: card.type === 'creature' ? 'summon' : card.type === 'trap' ? 'trap' : 'spell',
     cardId: card.id,
     detail: card.type === 'creature' ? `${effStats.atk}/${effStats.hp}` : `${effStats.cost}⚡`,
   });
+  if (runeLogEntry) {
+    nextLog = appendLog(nextLog, runeLogEntry);
+  }
   nextLog = appendEventsToLog(nextLog, next.round, events.slice(prevEventsLen));
 
   next.playerEther -= effStats.cost;
@@ -1749,7 +2016,7 @@ export function playCardFromHand(
   }
   next.playerHand = state.playerHand.filter((_, i) => i !== handIndex);
   next.mulliganDone = true;
-  next.playerResonance = Math.min(5, state.playerResonance + 1);
+  next.playerResonance = Math.min(5, next.playerResonance + 1);
   next.combatLog = nextLog;
   next.pendingEvents = events;
 
@@ -1757,7 +2024,14 @@ export function playCardFromHand(
     next.enemyHp = 0;
     next.phase = 'victory';
   }
-  return next;
+  if (card.spellEffect?.kind === 'buff_ally') {
+    shieldsGrantedCount += nextPlayerBoard.filter((c) => c !== null).length;
+  }
+  return withQuestEvaluation(next, {
+    summoned: card.type === 'creature' ? 1 : 0,
+    spells: card.type === 'spell' || card.type === 'ritual' ? 1 : 0,
+    shields: shieldsGrantedCount,
+  });
 }
 
 function findAdjacentGuard(
@@ -1798,6 +2072,8 @@ function resolveCombatSide(
     playerSchool?: MagicSchool;
     soulTetherActive?: boolean;
     lastLostAlly?: { creature: BoardCreature; lane: number } | null;
+    bossPassive?: BossPassiveId;
+    slotAftermath?: { player: SlotAftermathKind[]; enemy: SlotAftermathKind[] };
   },
   events: CombatEvent[]
 ): {
@@ -1984,8 +2260,21 @@ function resolveCombatSide(
     if (def.hp <= 0 || poisonedDef) {
       events.push({ type: 'creature_died', side: defendingSide, lane: defLane, uid: def.uid });
       defB[defLane] = null;
+      if (poisonedDef && stateForPassives.slotAftermath) {
+        stateForPassives.slotAftermath[defendingSide][defLane] = 'poison';
+      }
       applyCreatureDeathPassives(defendingSide, stateForPassives, events, def, defLane);
       if (atkFirst) {
+        if (attackingSide === 'player' && stateForPassives.bossPassive === 'boss_briar_thorns' && !atkFlying && atkB[lane]) {
+          atk.hp -= 1;
+          events.push({ type: 'hit_creature', side: 'player', lane, uid: atk.uid, amount: 1, label: '-1 🌿' });
+          if (atk.hp <= 0) {
+            events.push({ type: 'creature_died', side: 'player', lane, uid: atk.uid });
+            atkB[lane] = null;
+            applyCreatureDeathPassives('player', stateForPassives, events, atk, lane);
+            continue;
+          }
+        }
         atk.veteranCount += 1;
         atk.atk += 1;
         atk.hp += 1;
@@ -2011,11 +2300,24 @@ function resolveCombatSide(
       if (atk.hp <= 0 || poisonedAtk) {
         events.push({ type: 'creature_died', side: attackingSide, lane, uid: atk.uid });
         atkB[lane] = null;
+        if (poisonedAtk && stateForPassives.slotAftermath) {
+          stateForPassives.slotAftermath[attackingSide][lane] = 'poison';
+        }
         applyCreatureDeathPassives(attackingSide, stateForPassives, events, atk, lane);
       }
     }
 
     if (atkB[lane]) {
+      if (attackingSide === 'player' && stateForPassives.bossPassive === 'boss_briar_thorns' && !atkFlying) {
+        atk.hp -= 1;
+        events.push({ type: 'hit_creature', side: 'player', lane, uid: atk.uid, amount: 1, label: '-1 🌿' });
+        if (atk.hp <= 0) {
+          events.push({ type: 'creature_died', side: 'player', lane, uid: atk.uid });
+          atkB[lane] = null;
+          applyCreatureDeathPassives('player', stateForPassives, events, atk, lane);
+          continue;
+        }
+      }
       atk.veteranCount += 1;
       atk.atk += 1;
       atk.hp += 1;
@@ -2029,8 +2331,13 @@ function resolveCombatSide(
 
 export function resolvePlayerEndTurn(state: DuelState): DuelState {
   if (state.phase !== 'player_main') return state;
+  const opponent = getOpponentForStage(state.stageIndex);
   const prevEventsLen = state.pendingEvents.length;
   const events: CombatEvent[] = [...state.pendingEvents];
+  const turnAftermath: { player: SlotAftermathKind[]; enemy: SlotAftermathKind[] } = {
+    player: [null, null, null, null],
+    enemy: [null, null, null, null],
+  };
 
   // Artificers (Synth) Doctrine: Astrolabe Matrix converts >=1 unspent Ether into Shield/Fortify & +1 Resonance
   const endTurnUnspentEther = state.playerEther;
@@ -2081,6 +2388,8 @@ export function resolvePlayerEndTurn(state: DuelState): DuelState {
     playerSchool: state.playerSchool,
     soulTetherActive: state.soulTetherActive,
     lastLostAlly: state.lastLostAlly,
+    bossPassive: opponent.bossPassive,
+    slotAftermath: turnAftermath,
   };
 
   // 1. Player creatures attack (attack stance & non-exhausted only)
@@ -2107,30 +2416,31 @@ export function resolvePlayerEndTurn(state: DuelState): DuelState {
     enemyTrap: passiveTrack.enemyTrap,
     playerTrap: passiveTrack.playerTrap,
     lastLostAlly: passiveTrack.lastLostAlly,
+    slotAftermath: turnAftermath,
     damageDealtTotal: passiveTrack.damageDealtTotal + pAttack.damageDealt,
     nextUid: state.nextUid + pAttack.nextUidDelta,
     pendingEvents: events,
   };
 
   if (next.enemyHp <= 0) {
-    return {
+    return withQuestEvaluation({
       ...next,
       enemyHp: 0,
       phase: 'victory',
       combatLog: appendEventsToLog(next.combatLog, next.round, events.slice(prevEventsLen)),
-    };
+    });
   }
 
   // 2. AI Turn
   const aiPrevEventsLen = next.pendingEvents.length;
   next = executeAiTurn(next);
   if (next.enemyHp <= 0) {
-    return {
+    return withQuestEvaluation({
       ...next,
       enemyHp: 0,
       phase: 'victory',
       combatLog: appendEventsToLog(next.combatLog, next.round, next.pendingEvents.slice(aiPrevEventsLen)),
-    };
+    });
   }
   if (next.playerHp <= 0) {
     if (!next.phylacteryUsed && next.relics.includes('relic_phylactery')) {
@@ -2161,7 +2471,6 @@ export function resolvePlayerEndTurn(state: DuelState): DuelState {
   }
 
   // 3. Advance Round, reset exhausted & ability cooldowns, trigger turn-start enchantments & burn lanes
-  const opponent = getOpponentForStage(next.stageIndex);
   const nextRound = next.round + 1;
   const nextChannel = Math.min(MAX_CHANNEL, next.playerChannel + 1);
   let nextAnomaly = next.anomaly;
@@ -2197,6 +2506,7 @@ export function resolvePlayerEndTurn(state: DuelState): DuelState {
 
   // Chaos Resonance Cinder Rift burn lanes tick
   const nextChaosBurnLanes = (next.chaosBurnLanes ?? [0, 0, 0, 0]).map((t) => Math.max(0, t - 1));
+  const roundAftermath = cloneSlotAftermath(next.slotAftermath);
   const burnTrack = {
     playerHp: nextPlayerHp,
     playerMaxHp: next.playerMaxHp,
@@ -2226,6 +2536,7 @@ export function resolvePlayerEndTurn(state: DuelState): DuelState {
       if (foe.hp <= 0) {
         roundEvents.push({ type: 'creature_died', side: 'enemy', lane: i, uid: foe.uid });
         resetEnemyBoard[i] = null;
+        roundAftermath.enemy[i] = 'chaos';
         applyCreatureDeathPassives('enemy', burnTrack, roundEvents, foe, i);
       }
     }
@@ -2300,6 +2611,8 @@ export function resolvePlayerEndTurn(state: DuelState): DuelState {
     leapUsedThisTurn: false,
     swapUsedThisTurn: false,
     schoolDoctrineUsedThisTurn: false,
+    crossSchoolTriggeredThisTurn: false,
+    slotAftermath: roundAftermath,
     ultimatumActive: false,
     soulTetherActive: false,
     soulTetherLane: null,
@@ -2310,9 +2623,9 @@ export function resolvePlayerEndTurn(state: DuelState): DuelState {
     pendingEvents: roundEvents,
   };
 
-  if (next.phase === 'victory') return next;
+  if (next.phase === 'victory') return withQuestEvaluation(next);
   next = drawCardForPlayer(next);
-  return next;
+  return withQuestEvaluation(next);
 }
 
 function executeAiTurn(state: DuelState): DuelState {
@@ -2352,6 +2665,7 @@ function executeAiTurn(state: DuelState): DuelState {
 
   const eBoard = cloneBoard(state.enemyBoard);
   const pBoard = cloneBoard(state.playerBoard);
+  const aiAftermath = cloneSlotAftermath(state.slotAftermath);
   const passiveTrack = {
     playerHp: state.playerHp,
     playerMaxHp: state.playerMaxHp,
@@ -2366,14 +2680,42 @@ function executeAiTurn(state: DuelState): DuelState {
     playerSchool: state.playerSchool,
     soulTetherActive: state.soulTetherActive,
     lastLostAlly: state.lastLostAlly,
+    bossPassive: opponent.bossPassive,
+    slotAftermath: aiAftermath,
   };
   let nextUid = state.nextUid;
   let summonedCount = 0;
   let spellsCount = 0;
   let nextLog = state.combatLog;
+  let astralBlinkGranted = false;
 
-  // Unique Boss Passives (Stages 4 & 7)
-  if (opponent.bossPassive === 'boss_ember_tithe' && state.round >= 2 && state.round % 2 === 0) {
+  // Unique Rival Passives (Stages 2–7)
+  if (opponent.bossPassive === 'boss_clockwork_mend' && state.round >= 2) {
+    passiveTrack.enemyHp = Math.min(state.enemyMaxHp, passiveTrack.enemyHp + 1);
+    events.push({ type: 'hit_demiurge', side: 'enemy', school: 'synth', amount: -1, label: '+1 HP' });
+    let weakestIdx = -1;
+    let lowestHp = Infinity;
+    for (let i = 0; i < LANES; i++) {
+      const a = eBoard[i];
+      if (a && a.hp < lowestHp) {
+        lowestHp = a.hp;
+        weakestIdx = i;
+      }
+    }
+    if (weakestIdx >= 0 && eBoard[weakestIdx]) {
+      const a = eBoard[weakestIdx]!;
+      a.atk += 1;
+      a.hp += 1;
+      a.maxHp += 1;
+      events.push({ type: 'veteran', side: 'enemy', lane: weakestIdx, uid: a.uid, school: 'synth', label: '+1/+1' });
+    }
+    nextLog = appendLog(nextLog, {
+      round: state.round,
+      actor: 'enemy',
+      kind: 'boss',
+      detail: 'boss_clockwork_mend',
+    });
+  } else if (opponent.bossPassive === 'boss_ember_tithe' && state.round >= 2 && state.round % 2 === 0) {
     passiveTrack.playerHp -= 1;
     events.push({ type: 'hit_demiurge', side: 'player', school: 'chaos', amount: 1, label: '-1' });
     if (state.soulTetherActive) {
@@ -2495,6 +2837,26 @@ function executeAiTurn(state: DuelState): DuelState {
           school: card.school,
           label: `${atk}/${hp}`,
         });
+        if (opponent.bossPassive === 'boss_astral_blink' && !astralBlinkGranted && eBoard[targetLane]) {
+          astralBlinkGranted = true;
+          const boosted = eBoard[targetLane]!;
+          boosted.atk += 1;
+          boosted.shielded = true;
+          events.push({
+            type: 'veteran',
+            side: 'enemy',
+            lane: targetLane,
+            uid: boosted.uid,
+            school: 'kinet',
+            label: '+1 ATK & SHIELD',
+          });
+          nextLog = appendLog(nextLog, {
+            round: state.round,
+            actor: 'enemy',
+            kind: 'boss',
+            detail: 'boss_astral_blink',
+          });
+        }
         if (card.keywords.includes('heal')) {
           passiveTrack.enemyHp = Math.min(state.enemyMaxHp, passiveTrack.enemyHp + 2);
         }
@@ -2543,7 +2905,16 @@ function executeAiTurn(state: DuelState): DuelState {
         played = true;
         break;
       } else if (card.spellEffect) {
-        if (card.spellEffect.kind === 'damage_target' || card.spellEffect.kind === 'execute_or_burn' || card.spellEffect.kind === 'pulse_draw') {
+        const effectKind = card.spellEffect.kind;
+        if (
+          effectKind === 'damage_target' ||
+          effectKind === 'execute_or_burn' ||
+          effectKind === 'pulse_draw' ||
+          effectKind === 'drain_channel'
+        ) {
+          if (effectKind === 'damage_target' || effectKind === 'execute_or_burn' || effectKind === 'pulse_draw') {
+            if (pBoard.every((c) => c === null) && rng.next() < 0.15) continue;
+          }
           // Player synth_stasis_ward negates enemy spell!
           if (playerTrap === 'synth_stasis_ward') {
             playerTrap = null;
@@ -2554,7 +2925,8 @@ function executeAiTurn(state: DuelState): DuelState {
             const pTargetIdx = pBoard.findIndex((c) => c !== null);
             if (pTargetIdx >= 0 && pBoard[pTargetIdx]) {
               const t = pBoard[pTargetIdx]!;
-              t.hp -= spellDmg;
+              const hitDmg = effectKind === 'execute_or_burn' && t.hp <= spellDmg ? t.hp : spellDmg;
+              t.hp -= hitDmg;
               events.push({
                 type: 'spell',
                 side: 'enemy',
@@ -2562,11 +2934,11 @@ function executeAiTurn(state: DuelState): DuelState {
                 uid: t.uid,
                 cardId: card.id,
                 school: card.school,
-                amount: spellDmg,
-                label: `-${spellDmg}`,
+                amount: hitDmg,
+                label: `-${hitDmg}`,
               });
-              if (state.soulTetherActive && spellDmg > 0) {
-                const reflectDmg = Math.max(1, Math.ceil(spellDmg * 0.5));
+              if (state.soulTetherActive && hitDmg > 0) {
+                const reflectDmg = Math.max(1, Math.ceil(hitDmg * 0.5));
                 passiveTrack.enemyHp = Math.max(0, passiveTrack.enemyHp - reflectDmg);
                 passiveTrack.damageDealtTotal += reflectDmg;
                 events.push({
@@ -2581,21 +2953,21 @@ function executeAiTurn(state: DuelState): DuelState {
               if (t.hp <= 0) {
                 events.push({ type: 'creature_died', side: 'player', lane: pTargetIdx, uid: t.uid });
                 pBoard[pTargetIdx] = null;
+                if (card.school === 'chaos') aiAftermath.player[pTargetIdx] = 'chaos';
                 applyCreatureDeathPassives('player', passiveTrack, events, t, pTargetIdx);
               }
             } else {
-              const finalDmg = state.ultimatumActive && state.playerSchool === 'chaos' ? spellDmg : spellDmg;
-              passiveTrack.playerHp -= finalDmg;
+              passiveTrack.playerHp -= spellDmg;
               events.push({
                 type: 'hit_demiurge',
                 side: 'player',
                 cardId: card.id,
                 school: card.school,
-                amount: finalDmg,
-                label: `-${finalDmg}`,
+                amount: spellDmg,
+                label: `-${spellDmg}`,
               });
-              if (state.soulTetherActive && finalDmg > 0) {
-                const reflectDmg = Math.max(1, Math.ceil(finalDmg * 0.5));
+              if (state.soulTetherActive && spellDmg > 0) {
+                const reflectDmg = Math.max(1, Math.ceil(spellDmg * 0.5));
                 passiveTrack.enemyHp = Math.max(0, passiveTrack.enemyHp - reflectDmg);
                 passiveTrack.damageDealtTotal += reflectDmg;
                 events.push({
@@ -2607,6 +2979,116 @@ function executeAiTurn(state: DuelState): DuelState {
                 });
               }
             }
+            if (effectKind === 'drain_channel') {
+              ether += 1;
+              events.push({ type: 'overload', side: 'enemy', amount: 1, school: card.school, label: '+1 ⚡' });
+            }
+          }
+          ether -= card.cost;
+          enemyHand.splice(i, 1);
+          spellsCount += 1;
+          played = true;
+          break;
+        } else if (effectKind === 'aoe_enemy') {
+          if (!pBoard.some((c) => c !== null)) continue;
+          if (playerTrap === 'synth_stasis_ward') {
+            playerTrap = null;
+            passiveTrack.playerTrap = null;
+            events.push({ type: 'trap', side: 'player', school: 'synth', label: 'STASIS NEGATED!' });
+          } else {
+            const aoeDmg = card.spellEffect.amount + (state.anomaly === 'rift' ? 1 : 0);
+            let totalReflected = 0;
+            for (let lane = 0; lane < LANES; lane++) {
+              const t = pBoard[lane];
+              if (!t) continue;
+              t.hp -= aoeDmg;
+              totalReflected += aoeDmg;
+              events.push({
+                type: 'spell',
+                side: 'enemy',
+                lane,
+                uid: t.uid,
+                cardId: card.id,
+                school: card.school,
+                amount: aoeDmg,
+                label: `-${aoeDmg}`,
+              });
+              if (t.hp <= 0) {
+                events.push({ type: 'creature_died', side: 'player', lane, uid: t.uid });
+                pBoard[lane] = null;
+                if (card.school === 'chaos') aiAftermath.player[lane] = 'chaos';
+                applyCreatureDeathPassives('player', passiveTrack, events, t, lane);
+              }
+            }
+            if (state.soulTetherActive && totalReflected > 0) {
+              const reflectDmg = Math.max(1, Math.ceil(totalReflected * 0.5));
+              passiveTrack.enemyHp = Math.max(0, passiveTrack.enemyHp - reflectDmg);
+              passiveTrack.damageDealtTotal += reflectDmg;
+              events.push({
+                type: 'tether_reflect',
+                side: 'enemy',
+                amount: reflectDmg,
+                school: state.playerSchool,
+                label: `-${reflectDmg} ⛓`,
+              });
+            }
+          }
+          ether -= card.cost;
+          enemyHand.splice(i, 1);
+          spellsCount += 1;
+          played = true;
+          break;
+        } else if (effectKind === 'buff_ally') {
+          if (!eBoard.some((c) => c !== null)) continue;
+          const atkBuff = card.spellEffect.amount;
+          const hpBuff = card.spellEffect.hpBonus ?? 0;
+          for (let lane = 0; lane < LANES; lane++) {
+            const ally = eBoard[lane];
+            if (!ally) continue;
+            ally.atk += atkBuff;
+            ally.hp += hpBuff;
+            ally.maxHp += hpBuff;
+            if (card.id === 'synth_ward') ally.shielded = true;
+            events.push({
+              type: 'veteran',
+              side: 'enemy',
+              lane,
+              uid: ally.uid,
+              school: card.school,
+              label: `+${atkBuff}/+${hpBuff}`,
+            });
+          }
+          ether -= card.cost;
+          enemyHand.splice(i, 1);
+          spellsCount += 1;
+          played = true;
+          break;
+        } else if (effectKind === 'heal_and_buff') {
+          const canHeal = passiveTrack.enemyHp < state.enemyMaxHp - 2;
+          const allyIdx = eBoard.findIndex((c) => c !== null);
+          if (!canHeal && allyIdx < 0) continue;
+          passiveTrack.enemyHp = Math.min(state.enemyMaxHp, passiveTrack.enemyHp + card.spellEffect.amount);
+          events.push({
+            type: 'hit_demiurge',
+            side: 'enemy',
+            school: card.school,
+            amount: -card.spellEffect.amount,
+            label: `+${card.spellEffect.amount} HP`,
+          });
+          if (allyIdx >= 0 && eBoard[allyIdx]) {
+            const ally = eBoard[allyIdx]!;
+            const b = card.spellEffect.hpBonus ?? 1;
+            ally.atk += b;
+            ally.hp += b;
+            ally.maxHp += b;
+            events.push({
+              type: 'veteran',
+              side: 'enemy',
+              lane: allyIdx,
+              uid: ally.uid,
+              school: card.school,
+              label: `+${b}/+${b}`,
+            });
           }
           ether -= card.cost;
           enemyHand.splice(i, 1);
@@ -2617,6 +3099,38 @@ function executeAiTurn(state: DuelState): DuelState {
       }
     }
     if (!played) break;
+  }
+
+  if (opponent.bossPassive === 'boss_forged_bulwark') {
+    let weakestIdx = -1;
+    let lowestHp = Infinity;
+    for (let i = 0; i < LANES; i++) {
+      const ally = eBoard[i];
+      if (ally && ally.hp < lowestHp) {
+        lowestHp = ally.hp;
+        weakestIdx = i;
+      }
+    }
+    if (weakestIdx >= 0 && eBoard[weakestIdx]) {
+      const bulwark = eBoard[weakestIdx]!;
+      bulwark.shielded = true;
+      bulwark.hp += 1;
+      bulwark.maxHp += 1;
+      events.push({
+        type: 'leap_pulse',
+        side: 'enemy',
+        lane: weakestIdx,
+        uid: bulwark.uid,
+        school: 'synth',
+        label: '+0/+1 & SHIELD',
+      });
+      nextLog = appendLog(nextLog, {
+        round: state.round,
+        actor: 'enemy',
+        kind: 'boss',
+        detail: 'boss_forged_bulwark',
+      });
+    }
   }
 
   // AI Creatures Attack
@@ -2657,6 +3171,7 @@ function executeAiTurn(state: DuelState): DuelState {
     playerHp: aiAttack.defenderHp,
     damageDealtTotal: passiveTrack.damageDealtTotal,
     lastLostAlly: passiveTrack.lastLostAlly,
+    slotAftermath: aiAftermath,
     nextUid: nextUid + aiAttack.nextUidDelta,
     lastAiSummary: {
       acted,
@@ -2788,5 +3303,80 @@ export function computeEnemyIntent(state: DuelState): EnemyIntentSummary {
     playableCardsCount,
     expectedEnemyEther,
     mayOverload,
+  };
+}
+
+export interface BoardCombatPreview {
+  directToEnemyArchon: number;
+  creatureClashDmg: number;
+  enemyUnitsSlain: number;
+  readyAttackers: number;
+  isLethal: boolean;
+}
+
+export function computeBoardCombatPreview(state: DuelState): BoardCombatPreview {
+  let directToEnemyArchon = 0;
+  let creatureClashDmg = 0;
+  let enemyUnitsSlain = 0;
+  let readyAttackers = 0;
+  const usedGuards = new Set<string>();
+  const enemyRemainingHp = state.enemyBoard.map((c) => (c ? c.hp : 0));
+  const enemyShielded = state.enemyBoard.map((c) => Boolean(c?.shielded));
+  let enemyMirageTrapReady = state.enemyTrap === 'kinet_mirage_ward';
+  const ultimatumDouble = state.ultimatumActive && state.playerSchool === 'chaos';
+
+  for (let lane = 0; lane < LANES; lane++) {
+    const atk = state.playerBoard[lane];
+    if (!atk || atk.stance === 'guard' || atk.exhausted) continue;
+    readyAttackers += 1;
+
+    let defLane = lane;
+    let def = state.enemyBoard[lane];
+    const atkFlying = atk.keywords.includes('flying');
+    const directBlocked =
+      def !== null && enemyRemainingHp[lane] > 0 && (!atkFlying || def.keywords.includes('flying'));
+
+    if (!directBlocked) {
+      const interceptLane = findAdjacentGuard(state.enemyBoard, lane, atkFlying, usedGuards);
+      if (interceptLane >= 0 && enemyRemainingHp[interceptLane] > 0) {
+        defLane = interceptLane;
+        def = state.enemyBoard[interceptLane];
+        if (def) usedGuards.add(def.uid);
+      } else {
+        def = null;
+      }
+    }
+
+    if (def === null) {
+      if (enemyMirageTrapReady) {
+        enemyMirageTrapReady = false;
+        continue;
+      }
+      let dmg = atk.atk + (atk.cardId === 'kinet_vortex' ? 1 : 0);
+      if (ultimatumDouble) dmg *= 2;
+      directToEnemyArchon += dmg;
+    } else {
+      const guardBonus = def.stance === 'guard' ? 1 : 0;
+      const defArmor =
+        (def.keywords.includes('armor') ? 1 : 0) + (enemyShielded[defLane] ? 1 : 0) + guardBonus;
+      const dmgToDef = Math.max(0, atk.atk - defArmor);
+      enemyShielded[defLane] = false;
+      enemyRemainingHp[defLane] -= dmgToDef;
+      creatureClashDmg += dmgToDef;
+      const poisoned = dmgToDef > 0 && atk.keywords.includes('poison');
+      if (enemyRemainingHp[defLane] <= 0 || poisoned) {
+        enemyRemainingHp[defLane] = 0;
+        enemyUnitsSlain += 1;
+      }
+    }
+  }
+
+  const isLethal = state.enemyHp > 0 && directToEnemyArchon >= state.enemyHp;
+  return {
+    directToEnemyArchon,
+    creatureClashDmg,
+    enemyUnitsSlain,
+    readyAttackers,
+    isLethal,
   };
 }

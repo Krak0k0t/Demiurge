@@ -29,6 +29,10 @@
     font-family: 'Merriweather', Georgia, 'Times New Roman', serif;
   }
 
+  .font-title-serif {
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  }
+
   .font-num {
     font-family: 'Cinzel', Georgia, 'Times New Roman', serif;
     font-variant-numeric: tabular-nums;
@@ -47,13 +51,26 @@
 .stone-panel {
   position: relative;
   background:
-    radial-gradient(120% 90% at 50% 0%, rgba(226, 179, 84, 0.06) 0%, rgba(0, 0, 0, 0) 62%),
-    linear-gradient(180deg, rgba(33, 28, 42, 0.9) 0%, rgba(20, 17, 27, 0.92) 55%, rgba(14, 12, 20, 0.94) 100%);
+    radial-gradient(120% 90% at 50% 0%, rgba(226, 179, 84, 0.07) 0%, rgba(0, 0, 0, 0) 62%),
+    linear-gradient(180deg, rgba(33, 28, 42, 0.88) 0%, rgba(20, 17, 27, 0.91) 55%, rgba(14, 12, 20, 0.94) 100%);
   border: 1px solid rgba(176, 134, 62, 0.65);
   box-shadow:
-    inset 0 1px 0 rgba(255, 229, 168, 0.18),
+    inset 0 1px 0 rgba(255, 229, 168, 0.2),
     inset 0 -2px 5px rgba(0, 0, 0, 0.65),
     0 8px 22px rgba(0, 0, 0, 0.58);
+}
+
+/* Translucent Menu Obsidian Glass: lets live 3D cathedral clearly breathe behind title panels */
+.stone-panel-menu {
+  position: relative;
+  background:
+    radial-gradient(130% 85% at 50% 0%, rgba(226, 179, 84, 0.11) 0%, rgba(0, 0, 0, 0) 64%),
+    linear-gradient(180deg, rgba(28, 23, 38, 0.72) 0%, rgba(16, 13, 23, 0.78) 60%, rgba(11, 9, 16, 0.82) 100%);
+  border: 1px solid rgba(196, 150, 72, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 182, 0.26),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.62),
+    0 14px 36px rgba(0, 0, 0, 0.62);
 }
 
 .stone-panel-crimson {
@@ -81,22 +98,127 @@
 }
 
 .stone-btn {
-  background: linear-gradient(180deg, rgba(41, 36, 50, 0.92) 0%, rgba(25, 22, 32, 0.94) 60%, rgba(17, 14, 22, 0.96) 100%);
-  border: 1px solid rgba(145, 114, 58, 0.62);
+  background: linear-gradient(180deg, rgba(49, 43, 60, 0.93) 0%, rgba(29, 25, 38, 0.95) 55%, rgba(17, 14, 23, 0.97) 100%);
+  border: 1px solid rgba(168, 132, 68, 0.68);
   box-shadow:
-    inset 0 1px 0 rgba(255, 232, 180, 0.14),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.6),
-    0 3px 8px rgba(0, 0, 0, 0.45);
-  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), border-color 140ms ease, filter 140ms ease;
+    inset 0 1px 0 rgba(255, 236, 188, 0.22),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.72),
+    0 4px 10px rgba(0, 0, 0, 0.52);
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), border-color 140ms ease, filter 140ms ease, box-shadow 180ms ease;
 }
 
 .stone-btn:hover:not(:disabled) {
-  border-color: #e2b354;
-  filter: brightness(1.12);
+  border-color: #f0c86e;
+  filter: brightness(1.13);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 204, 0.32),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.7),
+    0 6px 14px rgba(0, 0, 0, 0.58),
+    0 0 12px rgba(226, 179, 84, 0.28);
 }
 
 .stone-btn:active:not(:disabled) {
   transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.75),
+    0 2px 5px rgba(0, 0, 0, 0.48);
+}
+
+/* High-contrast tactical action buttons */
+.btn-tactic-overload {
+  background: linear-gradient(180deg, #642119 0%, #431410 55%, #2a0c0a 100%) !important;
+  border-color: #e86b4e !important;
+  color: #ffd8cf !important;
+}
+.btn-tactic-overload-active {
+  background: linear-gradient(180deg, #8b271c 0%, #5c1610 100%) !important;
+  border-color: #ffa58c !important;
+  color: #fff0ea !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 210, 195, 0.35),
+    0 0 14px rgba(235, 92, 68, 0.45) !important;
+}
+
+.btn-tactic-altar {
+  background: linear-gradient(180deg, #5d1822 0%, #3d0f17 58%, #26080e 100%) !important;
+  border-color: #d95248 !important;
+  color: #ffd3ce !important;
+}
+.btn-tactic-altar-active {
+  background: linear-gradient(180deg, #87202c 0%, #55111a 100%) !important;
+  border-color: #ffe29a !important;
+  color: #fff2d6 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 224, 172, 0.4),
+    0 0 14px rgba(224, 78, 62, 0.48) !important;
+}
+
+.btn-tactic-ether {
+  background: linear-gradient(180deg, #164044 0%, #0e2a2d 58%, #091a1d 100%) !important;
+  border-color: #5ec8be !important;
+  color: #b8f9f2 !important;
+}
+.btn-tactic-ether-active {
+  background: linear-gradient(180deg, #1f5a5f 0%, #11393e 100%) !important;
+  border-color: #9bf7ee !important;
+  color: #e8fffd !important;
+  box-shadow:
+    inset 0 1px 0 rgba(185, 255, 248, 0.35),
+    0 0 14px rgba(94, 200, 190, 0.42) !important;
+}
+
+.btn-tactic-resonance {
+  background: linear-gradient(180deg, #34214d 0%, #201331 58%, #140b20 100%) !important;
+  border-color: #a682f2 !important;
+  color: #eadfff !important;
+}
+
+.btn-tactic-ultimatum {
+  background: linear-gradient(180deg, #7d1b18 0%, #4d0e0d 60%, #300707 100%) !important;
+  border-color: #ff8570 !important;
+  color: #ffe5df !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 200, 185, 0.35),
+    0 0 15px rgba(242, 88, 62, 0.44) !important;
+}
+
+/* Illuminated Scroll / Carved Tablet Header Banner */
+.scroll-tablet-banner {
+  position: relative;
+  background:
+    radial-gradient(110% 85% at 50% 0%, rgba(255, 224, 152, 0.16) 0%, rgba(0, 0, 0, 0) 68%),
+    linear-gradient(180deg, rgba(48, 37, 29, 0.9) 0%, rgba(30, 23, 24, 0.92) 56%, rgba(19, 15, 20, 0.94) 100%);
+  border: 1px solid rgba(214, 168, 86, 0.78);
+  border-left: 4px solid #d7a447;
+  border-right: 4px solid #d7a447;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 185, 0.32),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.65),
+    0 8px 22px rgba(0, 0, 0, 0.65);
+}
+
+.scroll-tablet-banner-overload {
+  border-color: rgba(235, 92, 68, 0.9);
+  border-left: 4px solid #ff7862;
+  border-right: 4px solid #ff7862;
+  background:
+    radial-gradient(110% 85% at 50% 0%, rgba(235, 92, 68, 0.24) 0%, rgba(0, 0, 0, 0) 68%),
+    linear-gradient(180deg, rgba(58, 25, 26, 0.92) 0%, rgba(34, 15, 18, 0.94) 100%);
+}
+
+/* Physical Carved Obsidian & Torchlit Altar Table Dock for Hand Cards */
+.altar-desk-ledge {
+  position: relative;
+  background:
+    radial-gradient(80% 100% at 50% 0%, rgba(232, 182, 88, 0.14) 0%, rgba(0, 0, 0, 0) 66%),
+    linear-gradient(180deg, rgba(35, 28, 34, 0.82) 0%, rgba(20, 16, 22, 0.9) 34%, rgba(11, 9, 14, 0.95) 100%);
+  border-top: 2px solid rgba(194, 148, 68, 0.72);
+  border-left: 1px solid rgba(166, 127, 56, 0.42);
+  border-right: 1px solid rgba(166, 127, 56, 0.42);
+  box-shadow:
+    inset 0 2px 10px rgba(255, 214, 142, 0.16),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.85),
+    0 -10px 28px rgba(0, 0, 0, 0.68);
 }
 
 button:focus-visible {
@@ -107,15 +229,25 @@ button:focus-visible {
 .gold-cta-btn {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, #f3cd72 0%, #cf983b 54%, #956520 100%);
-  border: 1.5px solid #ffe49f;
+  background: linear-gradient(180deg, #f5d37d 0%, #d49b3c 54%, #94631c 100%);
+  border: 1.5px solid #ffe8a8;
   color: #171009;
   box-shadow:
-    inset 0 1px 0 rgba(255, 249, 224, 0.75),
-    inset 0 -2px 3px rgba(66, 39, 8, 0.72),
+    inset 0 1px 0 rgba(255, 249, 224, 0.8),
+    inset 0 -3px 4px rgba(66, 39, 8, 0.78),
     0 8px 22px rgba(0, 0, 0, 0.68),
-    0 0 18px rgba(226, 179, 84, 0.28);
+    0 0 18px rgba(226, 179, 84, 0.32);
   transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), filter 140ms ease, box-shadow 240ms ease;
+}
+
+.gold-cta-hero {
+  background: linear-gradient(180deg, #ffe59c 0%, #ebb44c 48%, #a76e1d 100%);
+  border: 2px solid #fff3c7;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 253, 236, 0.92),
+    inset 0 -3px 5px rgba(74, 42, 6, 0.82),
+    0 12px 30px rgba(0, 0, 0, 0.78),
+    0 0 28px rgba(242, 194, 92, 0.52);
 }
 
 .gold-cta-btn::after {
@@ -150,13 +282,13 @@ button:focus-visible {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(100% 70% at 50% 0%, rgba(226, 179, 84, 0.11) 0%, rgba(0, 0, 0, 0) 60%),
-    linear-gradient(180deg, #25212d 0%, #17141d 60%, #100d14 100%);
+    radial-gradient(100% 70% at 50% 0%, rgba(226, 179, 84, 0.13) 0%, rgba(0, 0, 0, 0) 60%),
+    linear-gradient(180deg, #272230 0%, #18141f 60%, #100d15 100%);
   border: 1.5px solid #9f7939;
   box-shadow:
-    inset 0 1px 0 rgba(255, 232, 180, 0.25),
+    inset 0 1px 0 rgba(255, 232, 180, 0.28),
     inset 0 -3px 8px rgba(0, 0, 0, 0.85),
-    0 10px 24px rgba(0, 0, 0, 0.72);
+    0 14px 26px rgba(0, 0, 0, 0.84);
 }
 
 .tarot-card-altar {
@@ -205,8 +337,8 @@ button:focus-visible {
   .tarot-fan-item:hover:not(:disabled),
   .tarot-fan-item:focus-visible:not(:disabled),
   .tarot-fan-item[data-selected='true'] {
-    transform: perspective(680px) translateY(-12px) rotate(0deg) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) scale(1.04);
-    z-index: 25;
+    transform: perspective(680px) translateY(-18px) rotate(0deg) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) scale(1.07);
+    z-index: 35;
   }
 }
 
@@ -323,12 +455,23 @@ button:focus-visible {
 }
 
 /* Low (Eco): Solid flat fills, zero shadows, zero UI animations or transitions */
-:root[data-graphics='low'] .stone-panel {
+:root[data-graphics='low'] .stone-panel,
+:root[data-graphics='low'] .stone-panel-menu,
+:root[data-graphics='low'] .altar-desk-ledge,
+:root[data-graphics='low'] .obsidian-medallion,
+:root[data-graphics='low'] .obsidian-medallion-crimson {
   background: #17141c !important;
   box-shadow: none !important;
 }
+:root[data-graphics='low'] .scroll-tablet-banner,
+:root[data-graphics='low'] .scroll-tablet-perspective {
+  background: #1e1821 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
 :root[data-graphics='low'] .stone-panel-crimson,
-:root[data-graphics='low'] .stone-panel-overload {
+:root[data-graphics='low'] .stone-panel-overload,
+:root[data-graphics='low'] .scroll-tablet-banner-overload {
   background: #1d1216 !important;
   box-shadow: none !important;
 }
@@ -336,11 +479,13 @@ button:focus-visible {
   background: #231e29 !important;
   box-shadow: none !important;
 }
-:root[data-graphics='low'] .gold-cta-btn {
+:root[data-graphics='low'] .gold-cta-btn,
+:root[data-graphics='low'] .gold-cta-hero {
   background: #c89135 !important;
   box-shadow: none !important;
 }
-:root[data-graphics='low'] .tarot-card {
+:root[data-graphics='low'] .tarot-card,
+:root[data-graphics='low'] .tarot-card-floating {
   background: #17141d !important;
   box-shadow: none !important;
 }
@@ -366,4 +511,465 @@ button:focus-visible {
   animation: none !important;
   transition: none !important;
 }
+
+/* World-Integrated UI Geometry & Tactile Micro-Animations */
+.obsidian-medallion {
+  position: relative;
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+  background:
+    radial-gradient(120% 85% at 50% 0%, rgba(226, 179, 84, 0.14) 0%, rgba(16, 14, 24, 0) 68%),
+    linear-gradient(180deg, rgba(31, 26, 40, 0.84) 0%, rgba(19, 16, 28, 0.88) 65%, rgba(13, 11, 20, 0.92) 100%);
+  border: 1px solid rgba(196, 152, 74, 0.56);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 229, 168, 0.24),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.65),
+    0 10px 26px rgba(0, 0, 0, 0.58),
+    0 0 18px rgba(214, 168, 86, 0.14);
+}
+
+.obsidian-medallion-crimson {
+  position: relative;
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+  background:
+    radial-gradient(120% 85% at 50% 0%, rgba(215, 134, 88, 0.16) 0%, rgba(18, 13, 20, 0) 68%),
+    linear-gradient(180deg, rgba(34, 23, 30, 0.84) 0%, rgba(22, 16, 22, 0.88) 65%, rgba(15, 11, 17, 0.92) 100%);
+  border: 1px solid rgba(198, 132, 74, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 208, 168, 0.22),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.68),
+    0 10px 26px rgba(0, 0, 0, 0.58),
+    0 0 16px rgba(196, 118, 66, 0.14);
+}
+
+.scroll-tablet-perspective {
+  transform: perspective(640px) rotateX(10deg);
+  transform-origin: center top;
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+}
+
+.tarot-card-floating {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  background:
+    radial-gradient(100% 70% at 50% 0%, rgba(226, 179, 84, 0.14) 0%, rgba(0, 0, 0, 0) 60%),
+    linear-gradient(180deg, rgba(24, 22, 38, 0.88) 0%, rgba(15, 14, 26, 0.92) 65%, rgba(10, 9, 18, 0.95) 100%);
+  border: 1px solid rgba(206, 164, 88, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 180, 0.24),
+    0 16px 32px rgba(0, 0, 0, 0.78),
+    0 4px 12px rgba(0, 0, 0, 0.58);
+}
+
+.stone-btn:active:not(:disabled),
+.gold-cta-btn:active:not(:disabled) {
+  transform: scale(0.95) translateY(1px);
+  transition-duration: 110ms;
+}
+
+@keyframes medallionBreath {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 229, 168, 0.24),
+      0 10px 24px rgba(0, 0, 0, 0.56),
+      0 0 14px rgba(214, 168, 86, 0.12);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 238, 192, 0.34),
+      0 12px 26px rgba(0, 0, 0, 0.62),
+      0 0 22px rgba(214, 168, 86, 0.24);
+  }
+}
+
+.medallion-breath {
+  animation: medallionBreath 4.2s ease-in-out infinite;
+}
+
+/* Frosted Obsidian Glass & HUD Surfaces */
+.frosted-obsidian {
+  position: relative;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  background:
+    radial-gradient(120% 85% at 50% 0%, rgba(226, 179, 84, 0.1) 0%, rgba(16, 14, 24, 0) 68%),
+    linear-gradient(180deg, rgba(18, 17, 30, 0.34) 0%, rgba(10, 9, 18, 0.44) 100%);
+  border: 1px solid rgba(214, 168, 86, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 234, 182, 0.22),
+    inset 0 -3px 10px rgba(0, 0, 0, 0.35),
+    0 12px 28px rgba(0, 0, 0, 0.48);
+}
+
+.hud-surface {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Central Portal / Arcane Seal Medallion CTA */
+.portal-medallion {
+  position: relative;
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(114, 232, 212, 0.28) 0%, rgba(226, 179, 84, 0.22) 38%, rgba(16, 14, 24, 0.88) 76%),
+    linear-gradient(180deg, rgba(34, 28, 44, 0.88) 0%, rgba(14, 12, 20, 0.94) 100%);
+  border: 2px solid #ffe29a;
+  box-shadow:
+    inset 0 2px 14px rgba(123, 230, 219, 0.35),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.82),
+    0 0 34px rgba(226, 179, 84, 0.45),
+    0 0 64px rgba(94, 200, 190, 0.25),
+    0 18px 40px rgba(0, 0, 0, 0.8);
+  animation: portalMedallionPulse 3.4s ease-in-out infinite;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms ease, filter 180ms ease;
+}
+
+.portal-medallion:hover:not(:disabled) {
+  transform: scale(1.045);
+  filter: brightness(1.09);
+  box-shadow:
+    inset 0 2px 18px rgba(140, 248, 237, 0.48),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.82),
+    0 0 42px rgba(255, 224, 140, 0.65),
+    0 0 78px rgba(94, 200, 190, 0.38),
+    0 20px 44px rgba(0, 0, 0, 0.85);
+}
+
+.portal-medallion:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@keyframes portalMedallionPulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 2px 14px rgba(123, 230, 219, 0.3),
+      inset 0 -6px 14px rgba(0, 0, 0, 0.82),
+      0 0 28px rgba(226, 179, 84, 0.38),
+      0 0 54px rgba(94, 200, 190, 0.22),
+      0 18px 40px rgba(0, 0, 0, 0.8);
+  }
+  50% {
+    box-shadow:
+      inset 0 2px 18px rgba(140, 248, 237, 0.45),
+      inset 0 -6px 14px rgba(0, 0, 0, 0.82),
+      0 0 44px rgba(255, 224, 140, 0.62),
+      0 0 76px rgba(94, 200, 190, 0.38),
+      0 18px 44px rgba(0, 0, 0, 0.84);
+  }
+}
+
+@keyframes silkDamageShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+.silk-bar-shake {
+  animation: silkDamageShake 320ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes dustFloat {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.75);
+  }
+  25% {
+    opacity: 0.72;
+  }
+  75% {
+    opacity: 0.52;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(14px, -58px, 0) scale(1.15);
+  }
+}
+
+.arcane-dust-mote {
+  animation: dustFloat var(--dust-dur, 7s) ease-in-out var(--dust-delay, 0s) infinite;
+}
+
+/* Pre-Match Briefing Transparent Sanctum, Constellation & Grimoire Scroll */
+.briefing-vignette {
+  background: radial-gradient(
+    ellipse 82% 76% at 50% 50%,
+    rgba(6, 5, 12, 0) 48%,
+    rgba(5, 4, 10, 0.24) 100%
+  );
+}
+
+.briefing-frosted-sanctum {
+  position: relative;
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+  border-radius: 18px;
+  background:
+    radial-gradient(110% 70% at 50% 0%, rgba(226, 179, 84, 0.1) 0%, rgba(18, 16, 30, 0) 60%),
+    linear-gradient(180deg, rgba(16, 15, 28, 0.16) 0%, rgba(10, 9, 20, 0.24) 100%);
+  border: 1px solid rgba(226, 179, 84, 0.44);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 188, 0.24),
+    0 18px 46px rgba(0, 0, 0, 0.42),
+    0 0 32px rgba(214, 168, 86, 0.1);
+}
+
+.grimoire-scroll-tablet {
+  position: relative;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border-radius: 12px;
+  background:
+    radial-gradient(90% 100% at 50% 0%, rgba(226, 179, 84, 0.12) 0%, rgba(0, 0, 0, 0) 70%),
+    linear-gradient(180deg, rgba(28, 22, 18, 0.28) 0%, rgba(16, 13, 12, 0.36) 100%);
+  border: 1px solid rgba(218, 174, 96, 0.44);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 182, 0.2),
+    0 6px 16px rgba(0, 0, 0, 0.32);
+}
+
+.boss-name-aura {
+  text-shadow:
+    0 0 24px rgba(240, 198, 112, 0.58),
+    0 0 42px rgba(94, 200, 190, 0.3),
+    0 2px 10px rgba(0, 0, 0, 0.96);
+}
+
+@media (max-height: 540px) {
+  .briefing-frosted-sanctum {
+    max-width: 560px !important;
+    padding: 10px 16px 12px !important;
+    border-radius: 14px !important;
+  }
+  .briefing-constellation {
+    margin-top: 0 !important;
+    margin-bottom: 2px !important;
+    gap: 2px !important;
+  }
+  .briefing-constellation-track {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  .briefing-stage-pill {
+    margin-top: 2px !important;
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+    font-size: 9.5px !important;
+  }
+  .briefing-boss-title {
+    margin-top: 3px !important;
+    font-size: 1.35rem !important;
+    line-height: 1.1 !important;
+  }
+  .briefing-divider {
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+  }
+  .briefing-quote {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    font-size: 11.5px !important;
+    line-height: 1.28 !important;
+  }
+  .grimoire-scroll-tablet {
+    margin-top: 6px !important;
+    padding: 6px 10px !important;
+  }
+  .briefing-cta {
+    margin-top: 8px !important;
+    min-height: 38px !important;
+    padding: 6px 22px !important;
+    font-size: 11.5px !important;
+  }
+  .briefing-fs-btn {
+    top: 8px !important;
+    right: 8px !important;
+    width: 28px !important;
+    height: 28px !important;
+  }
+}
+
+@keyframes constellationPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 226, 154, 0.25),
+      0 0 14px rgba(255, 216, 128, 0.58);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(255, 226, 154, 0.14),
+      0 0 24px rgba(255, 226, 154, 0.88);
+    transform: scale(1.07);
+  }
+}
+
+.constellation-node-active {
+  animation: constellationPulse 2.4s ease-in-out infinite;
+}
+
+/* Combat UI Redesign Surfaces */
+.rival-crest-card {
+  position: relative;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px;
+  background:
+    radial-gradient(110% 80% at 15% 15%, rgba(94, 200, 190, 0.1) 0%, rgba(14, 16, 28, 0) 60%),
+    linear-gradient(180deg, rgba(19, 21, 34, 0.72) 0%, rgba(12, 13, 24, 0.78) 100%);
+  border: 1px solid rgba(214, 168, 86, 0.46);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 180, 0.2),
+    0 12px 28px rgba(0, 0, 0, 0.62),
+    0 0 20px rgba(22, 30, 56, 0.35);
+}
+
+.hex-crest-emblem {
+  clip-path: polygon(50% 2%, 94% 26%, 94% 74%, 50% 98%, 6% 74%, 6% 26%);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(226, 179, 84, 0.22) 0%, rgba(22, 24, 42, 0.92) 72%);
+  box-shadow: inset 0 0 12px rgba(255, 222, 150, 0.25);
+}
+
+.round-scroll-ribbon {
+  position: relative;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  border-radius: 9999px;
+  background:
+    radial-gradient(90% 100% at 50% 0%, rgba(226, 179, 84, 0.16) 0%, rgba(18, 17, 30, 0) 70%),
+    linear-gradient(90deg, rgba(16, 18, 32, 0.45) 0%, rgba(20, 22, 38, 0.74) 22%, rgba(20, 22, 38, 0.74) 78%, rgba(16, 18, 32, 0.45) 100%);
+  border-top: 1px solid rgba(226, 179, 84, 0.55);
+  border-bottom: 1px solid rgba(226, 179, 84, 0.42);
+  border-left: 1px solid rgba(226, 179, 84, 0.25);
+  border-right: 1px solid rgba(226, 179, 84, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 180, 0.22),
+    0 10px 26px rgba(0, 0, 0, 0.55);
+}
+
+.round-scroll-ribbon-overload {
+  border-top-color: rgba(235, 114, 92, 0.75);
+  border-bottom-color: rgba(235, 114, 92, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 192, 172, 0.26),
+    0 10px 26px rgba(95, 18, 14, 0.45);
+}
+
+.resource-belt-pod {
+  position: relative;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 9999px;
+  background:
+    linear-gradient(180deg, rgba(20, 22, 36, 0.74) 0%, rgba(11, 12, 22, 0.82) 100%);
+  border: 1px solid rgba(214, 168, 86, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 182, 0.2),
+    0 12px 26px rgba(0, 0, 0, 0.62);
+}
+
+.hand-scrim-gradient {
+  background: linear-gradient(
+    to top,
+    rgba(6, 7, 14, 0.72) 0%,
+    rgba(8, 10, 18, 0.34) 48%,
+    rgba(8, 10, 18, 0) 100%
+  );
+}
+
+.end-turn-seal {
+  border-radius: 14px;
+  box-shadow:
+    inset 0 2px 1px rgba(255, 248, 220, 0.78),
+    inset 0 -4px 6px rgba(72, 42, 6, 0.78),
+    0 10px 26px rgba(0, 0, 0, 0.72),
+    0 0 24px rgba(226, 179, 84, 0.42);
+}
+
+/* High Contrast Accessibility Mode (toggled on document.body) */
+body.high-contrast .hud-surface,
+body.high-contrast .frosted-obsidian,
+body.high-contrast .stone-panel,
+body.high-contrast .stone-panel-menu,
+body.high-contrast .obsidian-medallion,
+body.high-contrast .obsidian-medallion-crimson,
+body.high-contrast .briefing-frosted-sanctum,
+body.high-contrast .grimoire-scroll-tablet,
+body.high-contrast .rival-crest-card,
+body.high-contrast .round-scroll-ribbon,
+body.high-contrast .resource-belt-pod {
+  background: #000000 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: #ffd97d !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 8px 20px rgba(0, 0, 0, 0.95) !important;
+}
+
+body.high-contrast .stone-panel-crimson {
+  background: #0d0000 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: #ff8070 !important;
+}
+
+:root[data-graphics='low'] .frosted-obsidian,
+:root[data-graphics='low'] .hud-surface,
+:root[data-graphics='low'] .briefing-frosted-sanctum,
+:root[data-graphics='low'] .grimoire-scroll-tablet,
+:root[data-graphics='low'] .rival-crest-card,
+:root[data-graphics='low'] .round-scroll-ribbon,
+:root[data-graphics='low'] .resource-belt-pod {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: #14111a !important;
+  box-shadow: none !important;
+}
+
+:root[data-graphics='low'] .portal-medallion {
+  background: #2b2114 !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+:root[data-graphics='low'] .arcane-dust-mote,
+:root[data-graphics='low'] .hand-scrim-gradient {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold-cta-ready:not(:disabled),
+  .gold-cta-btn::after,
+  .medallion-breath,
+  .portal-medallion,
+  .arcane-dust-mote,
+  .silk-bar-shake,
+  .round-crest-banner,
+  .constellation-node-active {
+    animation: none !important;
+  }
+  .tarot-fan-item,
+  .stone-btn,
+  .gold-cta-btn {
+    transition-duration: 0ms !important;
+  }
+}
+
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { publishGameHandle, publishMetrics } from '../core/events';
 import { createCathedralHdriEnvironment } from './materials/proceduralNoise';
 import { createCinematicPipeline } from './postprocessing/cinematicPipeline';
@@ -15,7 +16,13 @@ import {
 } from '../core/graphicsSettings';
 import { readLaunchParams } from '../core/rng';
 import { CARD_CATALOG } from '../game/cards';
-import { getOpponentForStage, type BoardCreature, type CombatEvent, type DuelState } from '../game/duelEngine';
+import {
+  getOpponentForStage,
+  type BoardCreature,
+  type CombatEvent,
+  type DuelState,
+  type LaneRuneKind,
+} from '../game/duelEngine';
 import { buildArenaEnvironment } from './assets/arenaEnv';
 import { buildCombatVfx3d } from './assets/combatVfx3d';
 import { buildCreatureTotem, type CreatureTotemHandle, type MagicSchool } from './assets/creatureTotems';
@@ -25,6 +32,7 @@ import { createTarotMaterialLibrary, TAROT_PALETTE } from './materials/tarotMate
 import { AnimationQueue, type AnimationStep } from './animationQueue';
 import { VfxOverlay2D } from './vfxOverlay2d';
 import { etherAudio } from '../audio/etherAudio';
+import { filterHoveredLaneRunes, type LaneRuneTarget } from '../ui/hudLogic';
 
 export type CameraPreset = 'combat' | 'closeup' | 'wide';
 
@@ -52,6 +60,19 @@ export interface ProjectedBadge {
   visible: boolean;
 }
 
+export interface ProjectedLaneRune {
+  side: 'player' | 'enemy';
+  lane: number;
+  kind: LaneRuneKind;
+  x: number;
+  y: number;
+}
+
+export interface ExternalDeviceState {
+  isMobile: boolean;
+  inputMode: 'touch' | 'keyboard';
+}
+
 export interface TargetingPreview {
   startX: number;
   startY: number;
@@ -61,19 +82,36 @@ export interface TargetingPreview {
   altarMode?: boolean;
 }
 
+export type ArchonPowerHoverKind = 'chrono_rewind' | 'soul_tether' | 'resonance';
+
+export type ArcanePatternId = 'triangle' | 'star' | 'circle' | 'decoy';
+
+export interface WorldPromptInfo {
+  id: string;
+  x: number;
+  y: number;
+  kind: 'summon' | 'leap';
+}
+
 export interface DuelSceneBridge {
   syncDuelState: (state: DuelState | null, mode: 'title' | 'playing' | 'paused' | 'gameover') => number;
+  syncExternalState: (ext: ExternalDeviceState) => void;
   setPreset: (preset: CameraPreset) => void;
+  setBriefingCamera: (active: boolean) => void;
   setCardSelected: (selected: boolean) => void;
+  setPattern: (pattern: ArcanePatternId) => void;
+  triggerPattern: (pattern?: ArcanePatternId) => void;
   setTargetingPreview: (preview: TargetingPreview | null) => void;
+  setPowerHoverPreview: (kind: ArchonPowerHoverKind | null, snapshot?: DuelState | null) => void;
   triggerCardCast: (x: number, y: number, school: MagicSchool) => void;
   triggerVisualPulse: (lane?: number) => void;
+  triggerBattleStartVfx: (school?: MagicSchool) => void;
   dispose: () => void;
 }
 
 const PRESET_VIEWS: Record<CameraPreset, { pos: [number, number, number]; look: [number, number, number] }> = {
   combat: { pos: [-1.85, 6.7, 13.9], look: [0.05, 0.45, 0.65] },
-  closeup: { pos: [3.4, 2.35, 3.6], look: [0, 0.85, 0] },
+  closeup: { pos: [3.25, 2.35, 7.6], look: [0.0, 1.32, 3.0] },
   wide: { pos: [8.6, 7.2, 12.2], look: [0, 1.1, -0.8] },
 };
 
@@ -89,6 +127,10 @@ const _raycaster = new THREE.Raycaster();
 const _ndc = new THREE.Vector2();
 const _arenaPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const _hitPoint = new THREE.Vector3();
+const _tmpPreviewTarget = new THREE.Vector3();
+const _tmpA = new THREE.Vector3();
+const _tmpB = new THREE.Vector3();
+const _tmpC = new THREE.Vector3();
 
 function detectSoftwareGl(): boolean {
   const probe = document.createElement('canvas');
@@ -166,6 +208,8 @@ export function mountDuelScene(
   container: HTMLElement,
   callbacks: {
     onBadgesUpdate: (badges: ProjectedBadge[]) => void;
+    onLaneRunesUpdate?: (runes: ProjectedLaneRune[]) => void;
+    onWorldPromptUpdate?: (prompts: WorldPromptInfo[]) => void;
     onRightClickLane: (lane: number) => void;
     onLeftClickLane: (side: 'player' | 'enemy', lane: number) => void;
     onHoverTargetChange?: (target: HoverTargetInfo | null) => void;
@@ -195,10 +239,12 @@ export function mountDuelScene(
   camera.lookAt(_camLook);
 
   let currentGraphicsLevel = getGraphicsLevel();
+  let isMobileMode = false;
+  let inputMode: 'touch' | 'keyboard' = 'keyboard';
   const computeTargetDpr = (level: number): number => {
     if (isSoftwareGl) return 1;
     const nativeDpr = window.devicePixelRatio || 1;
-    if (level >= GRAPHICS_LEVEL.high) return Math.min(nativeDpr, 2);
+    if (level >= GRAPHICS_LEVEL.high) return Math.min(nativeDpr, isMobileMode ? 1.5 : 2);
     if (level >= GRAPHICS_LEVEL.medium) return Math.min(nativeDpr, 1.5);
     return Math.min(nativeDpr, 1.25);
   };
@@ -237,10 +283,13 @@ export function mountDuelScene(
   keyLight.castShadow = !isSoftwareGl && currentGraphicsLevel >= GRAPHICS_LEVEL.high;
   const initShadowRes = currentGraphicsLevel >= GRAPHICS_LEVEL.high ? 2048 : 1024;
   keyLight.shadow.mapSize.set(initShadowRes, initShadowRes);
-  keyLight.shadow.camera.left = -9;
-  keyLight.shadow.camera.right = 9;
-  keyLight.shadow.camera.top = 9;
-  keyLight.shadow.camera.bottom = -9;
+  keyLight.shadow.camera.left = -8.8;
+  keyLight.shadow.camera.right = 8.8;
+  keyLight.shadow.camera.top = 8.8;
+  keyLight.shadow.camera.bottom = -8.8;
+  keyLight.shadow.camera.near = 1;
+  keyLight.shadow.camera.far = 32;
+  keyLight.shadow.camera.updateProjectionMatrix();
   keyLight.shadow.bias = -0.0005;
   keyLight.shadow.normalBias = 0.02;
   scene.add(keyLight);
@@ -257,6 +306,30 @@ export function mountDuelScene(
   const channelLight = new THREE.PointLight(TAROT_PALETTE.ether, 0.85, 18, 1.4);
   channelLight.position.set(0, 6.2, 1.0);
   scene.add(channelLight);
+
+  // Subtle warm back-rim accent light separating the Archons & frontline totems on High+
+  const heroRimAccentLight = new THREE.PointLight(0xffcb78, 0.9, 15, 1.45);
+  heroRimAccentLight.position.set(0, 4.4, 3.1);
+  heroRimAccentLight.visible = currentGraphicsLevel >= GRAPHICS_LEVEL.high;
+  scene.add(heroRimAccentLight);
+
+  // Clerestory Studio RectAreaLight Rim Panels (hardware WebGL2 only, High/Ultra tiers)
+  let warmClerestoryLight: THREE.RectAreaLight | null = null;
+  let coolClerestoryLight: THREE.RectAreaLight | null = null;
+  if (!isSoftwareGl) {
+    RectAreaLightUniformsLib.init();
+    warmClerestoryLight = new THREE.RectAreaLight(0xffe1a8, 2.6, 6.5, 4.2);
+    warmClerestoryLight.position.set(9.5, 6.2, 2.5);
+    warmClerestoryLight.lookAt(0, 1.4, 0);
+    warmClerestoryLight.visible = currentGraphicsLevel >= GRAPHICS_LEVEL.high;
+    scene.add(warmClerestoryLight);
+
+    coolClerestoryLight = new THREE.RectAreaLight(0x66ddd2, 2.2, 6.5, 4.2);
+    coolClerestoryLight.position.set(-9.5, 5.8, -2.5);
+    coolClerestoryLight.lookAt(0, 1.4, 0);
+    coolClerestoryLight.visible = currentGraphicsLevel >= GRAPHICS_LEVEL.high;
+    scene.add(coolClerestoryLight);
+  }
 
   const arena = buildArenaEnvironment(mats);
   scene.add(arena.group);
@@ -299,15 +372,30 @@ export function mountDuelScene(
     lane: number;
     sigilMesh: THREE.Mesh;
     sigilMat: THREE.MeshStandardMaterial;
-    ringMat: THREE.MeshStandardMaterial;
+    curRingColor: THREE.Color;
     targetColor: THREE.Color;
     targetOpacity: number;
   }
+  const slotRingInstMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0x302512,
+    emissiveIntensity: 0.35,
+    roughness: 0.28,
+    metalness: 0.32,
+    transparent: true,
+    opacity: 0.52,
+  });
+  const slotRingInstanced = new THREE.InstancedMesh(slotRingGeo, slotRingInstMat, 8);
+  slotRingInstanced.frustumCulled = false;
+  const _ringDummy = new THREE.Object3D();
+  const _ringColorTmp = new THREE.Color();
+
   const slotVisuals: SlotVisual[] = [];
   (['player', 'enemy'] as const).forEach((side) => {
     for (let i = 0; i < 4; i++) {
       const lx = side === 'player' ? PLAYER_LANE_X[i] : ENEMY_LANE_X[i];
       const lz = side === 'player' ? 1.75 : -1.75;
+      const instIdx = slotVisuals.length;
 
       const sigilMat = new THREE.MeshStandardMaterial({
         map: slotSigilTex,
@@ -322,36 +410,96 @@ export function mountDuelScene(
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       });
-      const ringMat = new THREE.MeshStandardMaterial({
-        color: 0xc49c48,
-        emissive: 0xc49c48,
-        emissiveIntensity: 1.1,
-        roughness: 0.3,
-        metalness: 0.25,
-        transparent: true,
-        opacity: 0.28,
-      });
 
       const sigilMesh = new THREE.Mesh(slotSigilGeo, sigilMat);
       sigilMesh.position.set(lx, 0.014, lz);
       sigilMesh.renderOrder = 1;
       scene.add(sigilMesh);
 
-      const ringMesh = new THREE.Mesh(slotRingGeo, ringMat);
-      ringMesh.position.set(lx, 0.02, lz);
-      scene.add(ringMesh);
+      _ringDummy.position.set(lx, 0.02, lz);
+      _ringDummy.updateMatrix();
+      slotRingInstanced.setMatrixAt(instIdx, _ringDummy.matrix);
+      _ringColorTmp.setHex(0xc49c48).multiplyScalar(0.45);
+      slotRingInstanced.setColorAt(instIdx, _ringColorTmp);
 
       slotVisuals.push({
         side,
         lane: i,
         sigilMesh,
         sigilMat,
-        ringMat,
+        curRingColor: _ringColorTmp.clone(),
         targetColor: new THREE.Color(0x9c7c3b),
         targetOpacity: 0.22,
       });
     }
   });
+  slotRingInstanced.instanceMatrix.needsUpdate = true;
+  if (slotRingInstanced.instanceColor) slotRingInstanced.instanceColor.needsUpdate = true;
+  scene.add(slotRingInstanced);
+
+  // Pooled 3D Target Beacon for Archon Power Hover Previews (Chrono-Rewind / Soul Tether / Resonance)
+  const previewBeaconRingGeo = new THREE.RingGeometry(0.45, 0.56, 20);
+  previewBeaconRingGeo.rotateX(-Math.PI / 2);
+  const previewBeaconBeamGeo = new THREE.CylinderGeometry(0.18, 0.34, 1.5, 16, 1, true);
+  const previewBeaconMat = new THREE.MeshStandardMaterial({
+    color: 0xffe08a,
+    emissive: 0xffe08a,
+    emissiveIntensity: 1.45,
+    roughness: 0.22,
+    metalness: 0.12,
+    transparent: true,
+    opacity: 0.45,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const previewBeaconGroup = new THREE.Group();
+  const previewBeaconRing = new THREE.Mesh(previewBeaconRingGeo, previewBeaconMat);
+  previewBeaconRing.position.y = 0.04;
+  const previewBeaconBeam = new THREE.Mesh(previewBeaconBeamGeo, previewBeaconMat);
+  previewBeaconBeam.position.y = 0.78;
+  previewBeaconGroup.add(previewBeaconRing, previewBeaconBeam);
+  previewBeaconGroup.visible = false;
+  scene.add(previewBeaconGroup);
+
+  // Volumetric 3D Magical Hover Seal (Hexagonal outer torus + counter-rotating diamond ring + soft ward sheath)
+  const hoverSealOuterGeo = new THREE.TorusGeometry(0.72, 0.032, 6, 6);
+  hoverSealOuterGeo.rotateX(Math.PI / 2);
+  const hoverSealInnerGeo = new THREE.TorusGeometry(0.49, 0.022, 6, 4);
+  hoverSealInnerGeo.rotateX(Math.PI / 2);
+  const hoverSealBeamGeo = new THREE.CylinderGeometry(0.56, 0.72, 0.92, 6, 1, true);
+  const hoverSealOuterMat = new THREE.MeshStandardMaterial({
+    color: 0xffe29a,
+    emissive: 0xffe29a,
+    emissiveIntensity: 1.85,
+    roughness: 0.2,
+    metalness: 0.45,
+    transparent: true,
+    opacity: 0.88,
+    depthWrite: false,
+  });
+  const hoverSealBeamMat = new THREE.MeshStandardMaterial({
+    color: 0x66ddd2,
+    emissive: 0x66ddd2,
+    emissiveIntensity: 1.35,
+    roughness: 0.3,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.24,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+  const hoverSealGroup = new THREE.Group();
+  const hoverSealOuter = new THREE.Mesh(hoverSealOuterGeo, hoverSealOuterMat);
+  hoverSealOuter.position.y = 0.09;
+  const hoverSealInner = new THREE.Mesh(hoverSealInnerGeo, hoverSealOuterMat);
+  hoverSealInner.position.y = 0.13;
+  const hoverSealBeam = new THREE.Mesh(hoverSealBeamGeo, hoverSealBeamMat);
+  hoverSealBeam.position.y = 0.52;
+  hoverSealGroup.add(hoverSealOuter, hoverSealInner, hoverSealBeam);
+  hoverSealGroup.visible = false;
+  scene.add(hoverSealGroup);
 
   const pipeline = createCinematicPipeline(
     renderer,
@@ -400,6 +548,7 @@ export function mountDuelScene(
   };
 
   const clearHoverTarget = () => {
+    hoverSealGroup.visible = false;
     if (activeHoverKey !== null) {
       activeHoverKey = null;
       callbacks.onHoverTargetChange?.(null);
@@ -488,6 +637,9 @@ export function mountDuelScene(
     arenaVfx.setGraphicsLevel(level);
     combatVfx3d.setGraphicsLevel(level);
     vfx2d.setGraphicsLevel(level);
+    if (warmClerestoryLight) warmClerestoryLight.visible = level >= GRAPHICS_LEVEL.high;
+    if (coolClerestoryLight) coolClerestoryLight.visible = level >= GRAPHICS_LEVEL.high;
+    heroRimAccentLight.visible = level >= GRAPHICS_LEVEL.high;
 
     if (nextTier !== currentDetailTier) {
       currentDetailTier = nextTier;
@@ -514,8 +666,12 @@ export function mountDuelScene(
     playerBoard: Array<BoardCreature | null>;
     enemyBoard: Array<BoardCreature | null>;
     chaosBurnLanes?: number[];
+    playerSchool?: MagicSchool;
+    laneRunes?: DuelState['laneRunes'];
   } | null = null;
   let sceneMode: 'title' | 'playing' | 'paused' | 'gameover' = 'title';
+  let briefingCameraActive = false;
+  let hoveredLane: LaneRuneTarget | null = null;
   let currentPreset: CameraPreset = 'combat';
   let orbitYawOffset = 0;
   let orbitPitchOffset = 0;
@@ -530,8 +686,15 @@ export function mountDuelScene(
   let pointerNdcX = 0;
   let pointerNdcY = 0;
   let elapsed = 0;
+  let introSweepTimer = 0;
   let badgeAcc = 0;
+  let prevBadgeSig = '';
+  let prevRuneSig = '';
+  let prevPromptSig = '';
+  let activePattern: ArcanePatternId = 'triangle';
   let targetingPreview: TargetingPreview | null = null;
+  let hoveredPowerKind: ArchonPowerHoverKind | null = null;
+  let hoveredPowerSnapshot: DuelState | null = null;
 
   const targetBgColor = new THREE.Color(0x0e0c18);
   const targetFogColor = new THREE.Color(0x100e1c);
@@ -580,14 +743,14 @@ export function mountDuelScene(
     };
   };
 
-  const getLaneWorldPos = (side: 'player' | 'enemy', lane: number): THREE.Vector3 => {
+  const setLaneWorldPos = (side: 'player' | 'enemy', lane: number, out: THREE.Vector3): THREE.Vector3 => {
     const x = side === 'player' ? PLAYER_LANE_X[lane] ?? 0 : ENEMY_LANE_X[lane] ?? 0;
     const z = side === 'player' ? 1.75 : -1.75;
-    return new THREE.Vector3(x, 0.9, z);
+    return out.set(x, 0.9, z);
   };
 
-  const getDemiurgeWorldPos = (side: 'player' | 'enemy'): THREE.Vector3 =>
-    new THREE.Vector3(0, 1.6, side === 'player' ? 4.8 : -4.8);
+  const setDemiurgeWorldPos = (side: 'player' | 'enemy', out: THREE.Vector3): THREE.Vector3 =>
+    out.set(0, 1.6, side === 'player' ? 4.8 : -4.8);
 
   const applyOverloadColors = (active: boolean) => {
     overloadVisualState = active;
@@ -611,10 +774,51 @@ export function mountDuelScene(
     const playerBoardEmpty =
       sceneMode === 'playing' &&
       Boolean(latestBoardSnapshot?.playerBoard.every((cell) => cell === null));
+    let beaconPlaced = false;
+
+    let tetherPreviewLane = -1;
+    let chronoReviveLane = -1;
+    if (hoveredPowerKind === 'soul_tether' && hoveredPowerSnapshot) {
+      const pb = hoveredPowerSnapshot.playerBoard;
+      tetherPreviewLane = pb.findIndex((c) => c !== null && c.stance === 'guard');
+      if (tetherPreviewLane < 0) tetherPreviewLane = pb.findIndex((c) => c !== null);
+    } else if (hoveredPowerKind === 'chrono_rewind' && hoveredPowerSnapshot?.lastLostAlly) {
+      const pb = hoveredPowerSnapshot.playerBoard;
+      const orig = hoveredPowerSnapshot.lastLostAlly.lane;
+      chronoReviveLane = pb[orig] === null ? orig : pb.findIndex((c) => c === null);
+    }
+
     slotVisuals.forEach((sv) => {
       const board = sv.side === 'player' ? latestBoardSnapshot?.playerBoard : latestBoardSnapshot?.enemyBoard;
       const occupant = board?.[sv.lane] ?? null;
       const isBurning = sv.side === 'enemy' && (latestBoardSnapshot?.chaosBurnLanes?.[sv.lane] ?? 0) > 0;
+
+      if (hoveredPowerKind === 'chrono_rewind' && sv.side === 'player') {
+        if (sv.lane === chronoReviveLane || occupant) {
+          sv.targetColor.setHex(0xffd778);
+          sv.targetOpacity = 0.92;
+          if (sv.lane === chronoReviveLane) {
+            previewBeaconGroup.position.set(PLAYER_LANE_X[sv.lane], 0, 1.75);
+            previewBeaconMat.color.setHex(0xffd778);
+            previewBeaconMat.emissive.setHex(0xffd778);
+            beaconPlaced = true;
+          }
+          return;
+        }
+      } else if (hoveredPowerKind === 'soul_tether' && sv.side === 'player' && sv.lane === tetherPreviewLane) {
+        sv.targetColor.setHex(0x69efe3);
+        sv.targetOpacity = 0.94;
+        previewBeaconGroup.position.set(PLAYER_LANE_X[sv.lane], 0, 1.75);
+        previewBeaconMat.color.setHex(0x69efe3);
+        previewBeaconMat.emissive.setHex(0x69efe3);
+        beaconPlaced = true;
+        return;
+      } else if (hoveredPowerKind === 'resonance' && sv.side === 'enemy') {
+        sv.targetColor.setHex(schoolSlotHex(hoveredPowerSnapshot?.playerSchool));
+        sv.targetOpacity = 0.85;
+        return;
+      }
+
       if (isBurning && !occupant) {
         sv.targetColor.setHex(0xff6240);
         sv.targetOpacity = 0.56;
@@ -635,6 +839,8 @@ export function mountDuelScene(
         sv.targetOpacity = 0.22;
       }
     });
+
+    previewBeaconGroup.visible = beaconPlaced && sceneMode === 'playing';
   };
 
   const executeSingleEvent = (ev: CombatEvent) => {
@@ -697,12 +903,12 @@ export function mountDuelScene(
         pushBadges();
       }
       etherAudio.playSummon(school);
-      const worldPos = getLaneWorldPos(ev.side, ev.lane);
+      const worldPos = setLaneWorldPos(ev.side, ev.lane, _tmpA);
       const pt = projectWorldToScreen(worldPos);
       combatFocusX = worldPos.x * 0.2;
       combatFocusZ = ev.side === 'player' ? 0.55 : -0.95;
-      combatVfx3d.spawnSummonPillar(new THREE.Vector3(worldPos.x, 0.02, worldPos.z), school);
-      combatVfx3d.spawnSpellNova3D(new THREE.Vector3(worldPos.x, 0.08, worldPos.z), school, 1.25);
+      combatVfx3d.spawnSummonPillar(_tmpB.set(worldPos.x, 0.02, worldPos.z), school);
+      combatVfx3d.spawnSpellNova3D(_tmpB.set(worldPos.x, 0.08, worldPos.z), school, 1.25);
       if (highFx) vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(ev.school), 16, 185);
     } else if (ev.type === 'attack' && ev.uid) {
       // Phase 1 (Wind-up 0.2s) & Phase 2 (Dash 0.1s) start here; Phase 3 (Impact at 0.3s) fires in hit_creature / hit_demiurge
@@ -710,7 +916,7 @@ export function mountDuelScene(
       const totem = activeTotems.get(ev.uid);
       if (ev.lane !== undefined) {
         const lx = ev.side === 'player' ? PLAYER_LANE_X[ev.lane] ?? 0 : ENEMY_LANE_X[ev.lane] ?? 0;
-        const srcWorld = getLaneWorldPos(ev.side, ev.lane);
+        const srcWorld = setLaneWorldPos(ev.side, ev.lane, _tmpA);
         const src = projectWorldToScreen(srcWorld);
         const hasBlocker = ev.amount === undefined;
         if (hasBlocker) {
@@ -718,13 +924,13 @@ export function mountDuelScene(
           combatFocusX = lx * 0.32;
           combatFocusZ = ev.side === 'player' ? -0.45 : 0.55;
         } else {
-          const dstWorld = ev.side === 'player' ? getDemiurgeWorldPos('enemy') : getDemiurgeWorldPos('player');
+          const dstWorld = setDemiurgeWorldPos(ev.side === 'player' ? 'enemy' : 'player', _tmpB);
           const targetWorldYaw = Math.atan2(dstWorld.x - srcWorld.x, dstWorld.z - srcWorld.z);
           const baseYaw = totem ? totem.group.rotation.y : ev.side === 'player' ? Math.PI : 0;
           totem?.triggerAttack('direct', wrapAngleRad(targetWorldYaw - baseYaw), attackSpeed);
           combatFocusX = lx * 0.16;
           combatFocusZ = ev.side === 'player' ? -0.55 : 0.55;
-          combatVfx3d.spawnGroundShockwave(new THREE.Vector3(srcWorld.x, 0.04, srcWorld.z), school, 0.95);
+          combatVfx3d.spawnGroundShockwave(_tmpC.set(srcWorld.x, 0.04, srcWorld.z), school, 0.95);
           combatVfx3d.spawnProjectileBeam(srcWorld, dstWorld, school, fastCombat);
           if (highFx) {
             const dst = projectWorldToScreen(dstWorld);
@@ -738,11 +944,11 @@ export function mountDuelScene(
       etherAudio.playIntercept();
       const totem = activeTotems.get(ev.uid);
       totem?.triggerIntercept(Math.sign(ev.lane - ev.fromLane));
-      const worldPos = getLaneWorldPos(ev.side, ev.fromLane);
+      const worldPos = setLaneWorldPos(ev.side, ev.fromLane, _tmpA);
       const pt = projectWorldToScreen(worldPos);
       combatFocusX = worldPos.x * 0.28;
       combatVfx3d.spawnWeaponSlash3D(worldPos, school, 0, 1.15);
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(worldPos.x, 0.04, worldPos.z), school, 1.8);
+      combatVfx3d.spawnGroundShockwave(_tmpB.set(worldPos.x, 0.04, worldPos.z), school, 1.8);
       if (highFx) {
         vfx2d.spawnBurst(pt.x, pt.y, 0, 18, 210);
         vfx2d.spawnSlash(pt.x, pt.y, -0.35, 0, 48);
@@ -750,19 +956,19 @@ export function mountDuelScene(
       vfx2d.spawnText(pt.x, pt.y - 54, ev.label ?? 'INTERCEPT!', '#6CE8DC', 1.15);
     } else if (ev.type === 'stance' && ev.lane !== undefined) {
       etherAudio.playStance(ev.label === 'GUARD');
-      const worldPos = getLaneWorldPos(ev.side, ev.lane);
+      const worldPos = setLaneWorldPos(ev.side, ev.lane, _tmpA);
       const pt = projectWorldToScreen(worldPos);
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(worldPos.x, 0.04, worldPos.z), school, 1.25);
+      combatVfx3d.spawnGroundShockwave(_tmpB.set(worldPos.x, 0.04, worldPos.z), school, 1.25);
       if (highFx) vfx2d.spawnBurst(pt.x, pt.y, 0, 10, 140);
       if (ev.label) vfx2d.spawnText(pt.x, pt.y - 44, ev.label, '#7BE6DB', 0.95);
     } else if (ev.type === 'enchant') {
       etherAudio.playEnchant();
-      const archonPos = getDemiurgeWorldPos(ev.side);
+      const archonPos = setDemiurgeWorldPos(ev.side, _tmpA);
       const pt = projectWorldToScreen(archonPos);
       combatFocusZ = ev.side === 'player' ? 0.8 : -1.1;
       (ev.side === 'player' ? playerDemiurge : enemyDemiurge).triggerCastFlare();
-      combatVfx3d.spawnSummonPillar(new THREE.Vector3(archonPos.x, 0.05, archonPos.z), school);
-      combatVfx3d.spawnSpellNova3D(new THREE.Vector3(archonPos.x, 0.1, archonPos.z), school, 1.55);
+      combatVfx3d.spawnSummonPillar(_tmpB.set(archonPos.x, 0.05, archonPos.z), school);
+      combatVfx3d.spawnSpellNova3D(_tmpB.set(archonPos.x, 0.1, archonPos.z), school, 1.55);
       if (highFx) {
         vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(ev.school), 24, 240);
         vfx2d.triggerFlash('#5EC8BE', 0.16);
@@ -770,10 +976,10 @@ export function mountDuelScene(
       if (ev.label) vfx2d.spawnText(pt.x, pt.y - 44, ev.label, '#A8F3EC', 1.15);
     } else if (ev.type === 'trap') {
       etherAudio.playTrap();
-      const trapPos = new THREE.Vector3(0, 0.7, ev.side === 'player' ? 3.2 : -3.2);
+      const trapPos = _tmpA.set(0, 0.7, ev.side === 'player' ? 3.2 : -3.2);
       const pt = projectWorldToScreen(trapPos);
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(0, 0.05, trapPos.z), school, 2.35);
-      combatVfx3d.spawnSpellNova3D(new THREE.Vector3(0, 0.08, trapPos.z), school, 1.65);
+      combatVfx3d.spawnGroundShockwave(_tmpB.set(0, 0.05, trapPos.z), school, 2.35);
+      combatVfx3d.spawnSpellNova3D(_tmpB.set(0, 0.08, trapPos.z), school, 1.65);
       if (highFx) {
         vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(ev.school), 24, 240);
         vfx2d.triggerFlash('#E2B354', 0.18);
@@ -783,10 +989,10 @@ export function mountDuelScene(
       etherAudio.playAbility();
       const isAllyBuff = ev.label?.includes('SHIELD');
       const targetSide = isAllyBuff ? ev.side : ev.side === 'player' ? 'enemy' : 'player';
-      const targetWorld = getLaneWorldPos(targetSide, ev.lane);
+      const targetWorld = setLaneWorldPos(targetSide, ev.lane, _tmpA);
       const pt = projectWorldToScreen(targetWorld);
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(targetWorld.x, 0.04, targetWorld.z), school, 1.55);
-      combatVfx3d.spawnSpellNova3D(new THREE.Vector3(targetWorld.x, 0.08, targetWorld.z), school, 1.25);
+      combatVfx3d.spawnGroundShockwave(_tmpB.set(targetWorld.x, 0.04, targetWorld.z), school, 1.55);
+      combatVfx3d.spawnSpellNova3D(_tmpB.set(targetWorld.x, 0.08, targetWorld.z), school, 1.25);
       if (highFx) {
         vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(ev.school), 16, 190);
         if (ultraFx) trauma = Math.min(1, trauma + 0.22);
@@ -810,15 +1016,15 @@ export function mountDuelScene(
           pushBadges();
         }
       }
-      const worldPos = getLaneWorldPos(ev.side, ev.lane);
+      const worldPos = setLaneWorldPos(ev.side, ev.lane, _tmpA);
       const pt = projectWorldToScreen(worldPos);
       combatVfx3d.spawnWeaponSlash3D(
-        new THREE.Vector3(worldPos.x, 0.95, worldPos.z * 0.45),
+        _tmpB.set(worldPos.x, 0.95, worldPos.z * 0.45),
         school,
         ev.side === 'enemy' ? 0 : Math.PI,
         1.12
       );
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(worldPos.x, 0.04, worldPos.z), school, 1.55);
+      combatVfx3d.spawnGroundShockwave(_tmpB.set(worldPos.x, 0.04, worldPos.z), school, 1.55);
       if (highFx) {
         vfx2d.spawnSlash(pt.x, pt.y, ev.side === 'enemy' ? -0.55 : 2.55, schoolColorIndex(ev.school), 54);
         vfx2d.spawnBurst(pt.x, pt.y, 1, 16, 210);
@@ -829,7 +1035,7 @@ export function mountDuelScene(
     } else if (ev.type === 'creature_died' && ev.uid) {
       triggerDeferredDeath(ev.uid);
     } else if (ev.type === 'hit_demiurge') {
-      const archonPos = getDemiurgeWorldPos(ev.side);
+      const archonPos = setDemiurgeWorldPos(ev.side, _tmpA);
       const pt = projectWorldToScreen(archonPos);
       const isHeal = (ev.amount ?? 0) < 0;
       if (ev.cardId) {
@@ -852,14 +1058,14 @@ export function mountDuelScene(
       combatFocusX = 0;
       combatFocusZ = ev.side === 'enemy' ? -1.15 : 0.95;
       combatVfx3d.spawnGroundShockwave(
-        new THREE.Vector3(archonPos.x, 0.06, archonPos.z),
+        _tmpB.set(archonPos.x, 0.06, archonPos.z),
         isHeal ? 'vital' : school,
         isHeal ? 1.5 : 2.5
       );
       if (!isHeal) {
         (ev.side === 'player' ? playerDemiurge : enemyDemiurge).triggerHitRecoil();
         combatVfx3d.spawnWeaponSlash3D(
-          new THREE.Vector3(archonPos.x, 1.35, archonPos.z),
+          _tmpB.set(archonPos.x, 1.35, archonPos.z),
           school,
           ev.side === 'enemy' ? 0.35 : Math.PI - 0.35,
           1.22
@@ -891,11 +1097,11 @@ export function mountDuelScene(
       combatFocusZ = ev.side === 'enemy' ? -1.15 : 0.65;
       const targetWorld =
         ev.lane !== undefined
-          ? getLaneWorldPos(ev.side === 'player' ? 'enemy' : 'player', ev.lane)
-          : getDemiurgeWorldPos(ev.side === 'player' ? 'enemy' : 'player');
+          ? setLaneWorldPos(ev.side === 'player' ? 'enemy' : 'player', ev.lane, _tmpA)
+          : setDemiurgeWorldPos(ev.side === 'player' ? 'enemy' : 'player', _tmpA);
       const pt = projectWorldToScreen(targetWorld);
       combatVfx3d.spawnProjectileBeam(caster.staffOriginWorld, targetWorld, school, fastCombat);
-      combatVfx3d.spawnSpellNova3D(new THREE.Vector3(targetWorld.x, 0.1, targetWorld.z), school, 1.45);
+      combatVfx3d.spawnSpellNova3D(_tmpB.set(targetWorld.x, 0.1, targetWorld.z), school, 1.45);
       if (ev.uid && ev.amount !== undefined) {
         const meta = totemMeta.get(ev.uid);
         const targetTotem = activeTotems.get(ev.uid);
@@ -914,12 +1120,12 @@ export function mountDuelScene(
       if (ev.label) vfx2d.spawnText(pt.x, pt.y - 20, ev.label, '#F5C45E', 1.2);
     } else if (ev.type === 'overload') {
       etherAudio.playOverloadToggle(true);
-      const archonPos = getDemiurgeWorldPos(ev.side);
+      const archonPos = setDemiurgeWorldPos(ev.side, _tmpA);
       const pt = projectWorldToScreen(archonPos);
       combatFocusZ = ev.side === 'enemy' ? -1.1 : 0.8;
       (ev.side === 'player' ? playerDemiurge : enemyDemiurge).triggerCastFlare();
-      combatVfx3d.spawnSummonPillar(new THREE.Vector3(archonPos.x, 0.05, archonPos.z), 'chaos');
-      combatVfx3d.spawnSpellNova3D(new THREE.Vector3(archonPos.x, 0.1, archonPos.z), 'chaos', 1.65);
+      combatVfx3d.spawnSummonPillar(_tmpB.set(archonPos.x, 0.05, archonPos.z), 'chaos');
+      combatVfx3d.spawnSpellNova3D(_tmpB.set(archonPos.x, 0.1, archonPos.z), 'chaos', 1.65);
       if (highFx) {
         vfx2d.spawnBurst(pt.x, pt.y, 2, 26, 260);
         vfx2d.triggerFlash('#B93826', 0.26);
@@ -929,9 +1135,9 @@ export function mountDuelScene(
     } else if (ev.type === 'leap_pulse') {
       etherAudio.playLeapPulse();
       if (ev.uid) activeTotems.get(ev.uid)?.triggerJump();
-      const worldPos = getLaneWorldPos(ev.side, ev.lane ?? 1);
+      const worldPos = setLaneWorldPos(ev.side, ev.lane ?? 1, _tmpA);
       const pt = projectWorldToScreen(worldPos);
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(worldPos.x, 0.04, worldPos.z), 'kinet', 1.65);
+      combatVfx3d.spawnGroundShockwave(_tmpB.set(worldPos.x, 0.04, worldPos.z), 'kinet', 1.65);
       if (highFx) vfx2d.spawnBurst(pt.x, pt.y, 0, 20, 220);
       vfx2d.spawnText(pt.x, pt.y - 26, ev.label ?? 'SURGE', '#5EC8BE', 1.1);
     } else if (ev.type === 'veteran' && ev.lane !== undefined) {
@@ -953,20 +1159,22 @@ export function mountDuelScene(
           pushBadges();
         }
       }
-      const worldPos = getLaneWorldPos(ev.side, ev.lane);
+      const worldPos = setLaneWorldPos(ev.side, ev.lane, _tmpA);
       const pt = projectWorldToScreen(worldPos);
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(worldPos.x, 0.04, worldPos.z), 'synth', 1.1);
+      combatVfx3d.spawnGroundShockwave(_tmpB.set(worldPos.x, 0.04, worldPos.z), 'synth', 1.1);
       if (highFx) vfx2d.spawnBurst(pt.x, pt.y, 1, 14, 150);
       vfx2d.spawnText(pt.x, pt.y - 68, ev.label ?? '+1/+1', '#F5D06B', 0.95);
     } else if (ev.type === 'chrono_rewind') {
       etherAudio.playChronoRewind();
       playerDemiurge.triggerCastFlare();
       const worldPos =
-        ev.lane !== undefined ? getLaneWorldPos('player', ev.lane) : getDemiurgeWorldPos('player');
+        ev.lane !== undefined
+          ? setLaneWorldPos('player', ev.lane, _tmpA)
+          : setDemiurgeWorldPos('player', _tmpA);
       const pt = projectWorldToScreen(worldPos);
       combatFocusZ = 0.4;
-      combatVfx3d.spawnChronoAstrolabe3D(new THREE.Vector3(worldPos.x, 0.08, worldPos.z));
-      combatVfx3d.spawnSummonPillar(new THREE.Vector3(worldPos.x, 0.02, worldPos.z), 'synth');
+      combatVfx3d.spawnChronoAstrolabe3D(_tmpB.set(worldPos.x, 0.08, worldPos.z));
+      combatVfx3d.spawnSummonPillar(_tmpB.set(worldPos.x, 0.02, worldPos.z), 'synth');
       if (highFx) {
         vfx2d.spawnBurst(pt.x, pt.y, 0, 18, 220);
         if (ev.label === 'CHRONO-REVIVE!') vfx2d.triggerFlash('#F4CC68', 0.16);
@@ -975,23 +1183,27 @@ export function mountDuelScene(
     } else if (ev.type === 'soul_tether') {
       etherAudio.playSoulTether();
       playerDemiurge.triggerCastFlare();
-      const archonPos = getDemiurgeWorldPos('player');
+      const archonPos = setDemiurgeWorldPos('player', _tmpA);
       const targetPos =
-        ev.lane !== undefined ? getLaneWorldPos('player', ev.lane) : new THREE.Vector3(0, 1.1, 2.2);
+        ev.lane !== undefined
+          ? setLaneWorldPos('player', ev.lane, _tmpB)
+          : _tmpB.set(0, 1.1, 2.2);
       const pt = projectWorldToScreen(targetPos);
       combatVfx3d.spawnSoulTetherArc3D(archonPos, targetPos, school);
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(targetPos.x, 0.05, targetPos.z), school, 1.85);
+      combatVfx3d.spawnGroundShockwave(_tmpC.set(targetPos.x, 0.05, targetPos.z), school, 1.85);
       if (highFx) vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(school), 18, 210);
       vfx2d.spawnText(pt.x, pt.y - 36, ev.label ?? 'TETHER 50%', '#7BE6DB', 1.15);
     } else if (ev.type === 'tether_reflect') {
       etherAudio.playSoulTether();
       const srcPos =
-        ev.lane !== undefined ? getLaneWorldPos('player', ev.lane) : getDemiurgeWorldPos('player');
-      const enemyPos = getDemiurgeWorldPos('enemy');
+        ev.lane !== undefined
+          ? setLaneWorldPos('player', ev.lane, _tmpA)
+          : setDemiurgeWorldPos('player', _tmpA);
+      const enemyPos = setDemiurgeWorldPos('enemy', _tmpB);
       const pt = projectWorldToScreen(enemyPos);
       enemyDemiurge.triggerHitRecoil();
       combatVfx3d.spawnSoulTetherArc3D(srcPos, enemyPos, school);
-      combatVfx3d.spawnGroundShockwave(new THREE.Vector3(enemyPos.x, 0.06, enemyPos.z), school, 2.1);
+      combatVfx3d.spawnGroundShockwave(_tmpC.set(enemyPos.x, 0.06, enemyPos.z), school, 2.1);
       if (highFx) {
         const srcPt = projectWorldToScreen(srcPos);
         vfx2d.spawnBolt(srcPt.x, srcPt.y, pt.x, pt.y, schoolColorIndex(school));
@@ -1001,10 +1213,11 @@ export function mountDuelScene(
       vfx2d.spawnText(pt.x, pt.y - 46, ev.label ?? '-1 ⛓', '#A8F3EC', 1.25);
     } else if (ev.type === 'resonance') {
       etherAudio.playResonanceApotheosis(school);
+      arena.triggerRoseFlare(school, true);
       playerDemiurge.triggerCastFlare();
-      const archonPos = getDemiurgeWorldPos('player');
-      const enemyPos = getDemiurgeWorldPos('enemy');
-      const centerPos = new THREE.Vector3(0, 0.8, 0);
+      const archonPos = setDemiurgeWorldPos('player', _tmpA);
+      const enemyPos = setDemiurgeWorldPos('enemy', _tmpB);
+      const centerPos = _tmpC.set(0, 0.8, 0);
       const pt = projectWorldToScreen(centerPos);
       combatFocusX = 0;
       combatFocusZ = 0;
@@ -1015,6 +1228,8 @@ export function mountDuelScene(
         if (ultraFx) trauma = Math.min(1, trauma + 0.52);
       }
       vfx2d.spawnText(pt.x, pt.y - 30, ev.label ?? 'APOTHEOSIS', '#FFE7AE', 1.4);
+    } else if (ev.type === 'ultimatum') {
+      arena.triggerRoseFlare(school, true);
     }
   };
 
@@ -1248,12 +1463,24 @@ export function mountDuelScene(
     targetRimColor.setHex(atm.rimHex);
   };
 
-  const pushBadges = () => {
+  const pushBadges = (force = false) => {
     if (sceneMode === 'title') {
-      callbacks.onBadgesUpdate([]);
+      if (prevBadgeSig !== '') {
+        prevBadgeSig = '';
+        callbacks.onBadgesUpdate([]);
+      }
+      if (prevRuneSig !== '') {
+        prevRuneSig = '';
+        callbacks.onLaneRunesUpdate?.([]);
+      }
+      if (prevPromptSig !== '') {
+        prevPromptSig = '';
+        callbacks.onWorldPromptUpdate?.([]);
+      }
       return;
     }
     const list: ProjectedBadge[] = [];
+    let sig = '';
     for (const [uid, handle] of activeTotems.entries()) {
       if (deferredSummonUids.has(uid)) continue;
       const meta = totemMeta.get(uid);
@@ -1261,6 +1488,9 @@ export function mountDuelScene(
       handle.badgeAnchor.getWorldPosition(_proj);
       _proj.project(camera);
       if (_proj.z < -1 || _proj.z > 1) continue;
+      const sx = (_proj.x * 0.5 + 0.5) * width;
+      const sy = (-_proj.y * 0.5 + 0.5) * height;
+      sig += `${uid}:${Math.round(sx)},${Math.round(sy)},${meta.atk}/${meta.hp},${meta.veteranCount},${meta.shielded ? 1 : 0},${meta.stance},${meta.exhausted ? 1 : 0},${meta.abilityUsedThisTurn ? 1 : 0};`;
       list.push({
         uid,
         cardId: meta.cardId,
@@ -1276,12 +1506,84 @@ export function mountDuelScene(
         exhausted: Boolean(meta.exhausted),
         activeAbility: meta.activeAbility,
         abilityUsed: Boolean(meta.abilityUsedThisTurn),
-        x: (_proj.x * 0.5 + 0.5) * width,
-        y: (-_proj.y * 0.5 + 0.5) * height,
+        x: sx,
+        y: sy,
         visible: true,
       });
     }
-    callbacks.onBadgesUpdate(list);
+    if (force || sig !== prevBadgeSig) {
+      prevBadgeSig = sig;
+      callbacks.onBadgesUpdate(list);
+    }
+
+    if (callbacks.onLaneRunesUpdate) {
+      const runesList: ProjectedLaneRune[] = [];
+      let runeSig = '';
+      const laneRunes = latestBoardSnapshot?.laneRunes;
+      if (laneRunes && sceneMode === 'playing' && hoveredLane) {
+        const sides: Array<{ side: 'player' | 'enemy'; arr: Array<LaneRuneKind | null>; xs: number[]; z: number }> = [
+          { side: 'player', arr: laneRunes.player, xs: PLAYER_LANE_X, z: 2.09 },
+          { side: 'enemy', arr: laneRunes.enemy, xs: ENEMY_LANE_X, z: -2.09 },
+        ];
+        const rawRunes: ProjectedLaneRune[] = [];
+        for (const s of sides) {
+          for (let i = 0; i < 4; i++) {
+            const kind = s.arr[i];
+            if (!kind) continue;
+            _proj.set(s.xs[i] + 0.15, 0.56, s.z).project(camera);
+            if (_proj.z < -1 || _proj.z > 1) continue;
+            const rx = (_proj.x * 0.5 + 0.5) * width;
+            const ry = (-_proj.y * 0.5 + 0.5) * height;
+            rawRunes.push({ side: s.side, lane: i, kind, x: rx, y: ry });
+          }
+        }
+        const filtered = filterHoveredLaneRunes(rawRunes, hoveredLane);
+        for (const r of filtered) {
+          runeSig += `${r.side}:${r.lane}:${r.kind}:${Math.round(r.x)},${Math.round(r.y)};`;
+          runesList.push(r);
+        }
+      }
+      if (force || runeSig !== prevRuneSig) {
+        prevRuneSig = runeSig;
+        callbacks.onLaneRunesUpdate(runesList);
+      }
+    }
+
+    if (callbacks.onWorldPromptUpdate) {
+      const promptList: WorldPromptInfo[] = [];
+      let promptSig = '';
+      if (sceneMode === 'playing' && latestBoardSnapshot) {
+        if (cardSelected) {
+          const emptyIdx = latestBoardSnapshot.playerBoard.findIndex((c) => c === null);
+          if (emptyIdx >= 0) {
+            _proj.set(PLAYER_LANE_X[emptyIdx], 0.42, 1.75).project(camera);
+            if (_proj.z >= -1 && _proj.z <= 1) {
+              const px = (_proj.x * 0.5 + 0.5) * width;
+              const py = (-_proj.y * 0.5 + 0.5) * height;
+              promptSig += `summon:${emptyIdx}:${Math.round(px)},${Math.round(py)};`;
+              promptList.push({ id: `summon-${emptyIdx}`, x: px, y: py, kind: 'summon' });
+            }
+          }
+        } else {
+          const readyIdx = latestBoardSnapshot.playerBoard.findIndex(
+            (c) => c !== null && !c.shielded && !c.exhausted
+          );
+          if (readyIdx >= 0) {
+            _proj.set(PLAYER_LANE_X[readyIdx], 1.55, 1.75).project(camera);
+            if (_proj.z >= -1 && _proj.z <= 1) {
+              const px = (_proj.x * 0.5 + 0.5) * width;
+              const py = (-_proj.y * 0.5 + 0.5) * height;
+              promptSig += `leap:${readyIdx}:${Math.round(px)},${Math.round(py)};`;
+              promptList.push({ id: `leap-${readyIdx}`, x: px, y: py, kind: 'leap' });
+            }
+          }
+        }
+      }
+      if (force || promptSig !== prevPromptSig) {
+        prevPromptSig = promptSig;
+        callbacks.onWorldPromptUpdate(promptList);
+      }
+    }
   };
 
   function triggerDeferredDeath(uid: string) {
@@ -1289,13 +1591,13 @@ export function mountDuelScene(
     const handle = activeTotems.get(uid);
     if (!handle) return;
     etherAudio.playDeathShatter();
-    combatVfx3d.spawnShatterBurst(handle.group.position, handle.school, 11);
+    combatVfx3d.spawnCreatureVanish3D(handle.group.position, handle.school);
     if (currentGraphicsLevel >= GRAPHICS_LEVEL.high) {
       const pt = projectWorldToScreen(handle.group.position);
       vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(handle.school), 16, 180);
     }
     handle.triggerDeath();
-    dyingTotems.push({ handle, timer: 0.62 });
+    dyingTotems.push({ handle, timer: 0.7 });
     activeTotems.delete(uid);
     totemMeta.delete(uid);
     totemTargets.delete(uid);
@@ -1335,11 +1637,14 @@ export function mountDuelScene(
     sceneMode = mode;
     if (mode !== 'playing') {
       clearHoverTarget();
+      hoveredLane = null;
     }
     if (!state) {
       latestBoardSnapshot = null;
       arena.setEnchantments(null, null);
       arena.setTraps(null, null);
+      arena.setSlotAftermath(undefined);
+      arena.setLaneRunes(undefined);
       applyOverloadColors(false);
       resonanceVisualLevel = 0;
       soulTetherVisualState = false;
@@ -1351,7 +1656,7 @@ export function mountDuelScene(
       }
       if (activeTotems.size === 0) spawnShowcase();
       badgeAcc = 0;
-      pushBadges();
+      pushBadges(true);
       return 0;
     }
 
@@ -1364,13 +1669,14 @@ export function mountDuelScene(
     if (state.phase === 'victory' && !enemyShattered) {
       enemyShattered = true;
       enemyDemiurge.triggerDefeatShatter();
+      const enemyPos = setDemiurgeWorldPos('enemy', _tmpA);
       combatVfx3d.spawnShatterBurst(
-        getDemiurgeWorldPos('enemy'),
+        enemyPos,
         getOpponentForStage(currentStageIdx).school,
         16
       );
       if (currentGraphicsLevel >= GRAPHICS_LEVEL.high) {
-        const pt = projectWorldToScreen(getDemiurgeWorldPos('enemy'));
+        const pt = projectWorldToScreen(enemyPos);
         vfx2d.spawnBurst(pt.x, pt.y, 1, 28, 320);
         vfx2d.spawnBurst(pt.x, pt.y, 2, 24, 260);
         vfx2d.spawnSlash(pt.x, pt.y, -0.45, 1, 72);
@@ -1385,6 +1691,8 @@ export function mountDuelScene(
       playerBoard: state.playerBoard,
       enemyBoard: state.enemyBoard,
       chaosBurnLanes: state.chaosBurnLanes,
+      playerSchool: state.playerSchool,
+      laneRunes: state.laneRunes,
     };
     const pEnchSchool = state.playerEnchantment ? (CARD_CATALOG[state.playerEnchantment]?.school ?? null) : null;
     const eEnchSchool = state.enemyEnchantment ? (CARD_CATALOG[state.enemyEnchantment]?.school ?? null) : null;
@@ -1392,6 +1700,8 @@ export function mountDuelScene(
     const eTrapSchool = state.enemyTrap ? (CARD_CATALOG[state.enemyTrap]?.school ?? null) : null;
     arena.setEnchantments(pEnchSchool, eEnchSchool);
     arena.setTraps(pTrapSchool, eTrapSchool);
+    arena.setSlotAftermath(state.slotAftermath);
+    arena.setLaneRunes(state.laneRunes);
 
     applyOverloadColors(state.overloadUsedThisTurn || state.ultimatumActive);
     resonanceVisualLevel = state.playerResonance;
@@ -1460,8 +1770,8 @@ export function mountDuelScene(
           if (unit.veteranCount > prevVeteran) {
             etherAudio.playAscend();
             handle.triggerAscend();
-            combatVfx3d.spawnSummonPillar(new THREE.Vector3(targetX, 0.02, targetZ), unit.school);
-            combatVfx3d.spawnSpellNova3D(new THREE.Vector3(targetX, 0.12, targetZ), unit.school, 1.35);
+            combatVfx3d.spawnSummonPillar(_tmpA.set(targetX, 0.02, targetZ), unit.school);
+            combatVfx3d.spawnSpellNova3D(_tmpA.set(targetX, 0.12, targetZ), unit.school, 1.35);
           }
           handle.atk = unit.atk;
           handle.hp = unit.hp;
@@ -1484,13 +1794,13 @@ export function mountDuelScene(
           continue;
         }
         shatteredAny = true;
-        combatVfx3d.spawnShatterBurst(handle.group.position, handle.school, 11);
+        combatVfx3d.spawnCreatureVanish3D(handle.group.position, handle.school);
         if (currentGraphicsLevel >= GRAPHICS_LEVEL.high) {
           const pt = projectWorldToScreen(handle.group.position);
           vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(handle.school), 16, 180);
         }
         handle.triggerDeath();
-        dyingTotems.push({ handle, timer: 0.62 });
+        dyingTotems.push({ handle, timer: 0.7 });
         activeTotems.delete(uid);
         totemMeta.delete(uid);
         totemTargets.delete(uid);
@@ -1560,7 +1870,7 @@ export function mountDuelScene(
   let isDraggingOrbit = false;
   let multiTouchUsed = false;
   let prevPinchDist = 0;
-  const DRAG_THRESHOLD_PX = 6;
+  const getDragThresholdPx = () => (isMobileMode ? 10 : 6);
 
   const getPinchDistance = (): number => {
     if (activePointers.size < 2) return 0;
@@ -1570,6 +1880,7 @@ export function mountDuelScene(
 
   const onPointerDown = (e: PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+    introSweepTimer = 0;
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, button: e.button });
     if (activePointers.size === 1) {
       primaryPointerId = e.pointerId;
@@ -1588,6 +1899,8 @@ export function mountDuelScene(
       clearHoverTarget();
     }
   };
+
+  let lastHoverRaycastMs = 0;
 
   const onPointerMove = (e: PointerEvent) => {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -1617,7 +1930,7 @@ export function mountDuelScene(
         lastDragY = e.clientY;
         dragDistance += Math.hypot(dx, dy);
 
-        if (dragDistance > DRAG_THRESHOLD_PX) {
+        if (dragDistance > getDragThresholdPx()) {
           if (!isDraggingOrbit) {
             isDraggingOrbit = true;
             try {
@@ -1635,14 +1948,61 @@ export function mountDuelScene(
       }
     }
 
-    if (!hoverEnabled || sceneMode !== 'playing' || !callbacks.onHoverTargetChange) {
+    if (
+      sceneMode !== 'playing' ||
+      (inputMode === 'touch' && activePointers.size === 0)
+    ) {
+      if (hoveredLane !== null) {
+        hoveredLane = null;
+        pushBadges(true);
+      }
       clearHoverTarget();
       renderer.domElement.style.cursor = cardSelected ? 'crosshair' : 'grab';
       return;
     }
 
+    const nowMs = performance.now();
+    if (nowMs - lastHoverRaycastMs < 24) {
+      return;
+    }
+    lastHoverRaycastMs = nowMs;
+
     _ndc.set(pointerNdcX, pointerNdcY);
     _raycaster.setFromCamera(_ndc, camera);
+
+    // Detect hovered board hex/lane so lane runes only display on hover
+    let nextHoveredLane: LaneRuneTarget | null = null;
+    if (_raycaster.ray.intersectPlane(_arenaPlane, _hitPoint)) {
+      const absZ = Math.abs(_hitPoint.z);
+      if (absZ >= 0.72 && absZ <= 3.05 && Math.abs(_hitPoint.x) <= 4.15) {
+        let bestLane = 0;
+        let bestDist = Infinity;
+        PLAYER_LANE_X.forEach((lx, idx) => {
+          const d = Math.abs(_hitPoint.x - lx);
+          if (d < bestDist) {
+            bestDist = d;
+            bestLane = idx;
+          }
+        });
+        if (bestDist <= 1.05) {
+          nextHoveredLane = { side: _hitPoint.z < 0 ? 'enemy' : 'player', lane: bestLane };
+        }
+      }
+    }
+    if (
+      nextHoveredLane?.side !== hoveredLane?.side ||
+      nextHoveredLane?.lane !== hoveredLane?.lane
+    ) {
+      hoveredLane = nextHoveredLane;
+      pushBadges(true);
+    }
+
+    if (!hoverEnabled || !callbacks.onHoverTargetChange || hoverColliders.length === 0) {
+      clearHoverTarget();
+      renderer.domElement.style.cursor = cardSelected ? 'crosshair' : 'grab';
+      return;
+    }
+
     const hits = _raycaster.intersectObjects(hoverColliders, false);
     const hitData = hits[0]?.object?.userData?.hoverTarget as
       | { kind: 'creature'; uid: string }
@@ -1666,6 +2026,14 @@ export function mountDuelScene(
       const nextKey = `creature:${hitData.uid}`;
       if (nextKey !== activeHoverKey) {
         activeHoverKey = nextKey;
+        const sealHex = totem.side === 'enemy' ? 0xe85a46 : schoolSlotHex(totem.school);
+        hoverSealOuterMat.color.setHex(sealHex);
+        hoverSealOuterMat.emissive.setHex(sealHex);
+        hoverSealBeamMat.color.setHex(sealHex);
+        hoverSealBeamMat.emissive.setHex(sealHex);
+        hoverSealGroup.position.set(totem.group.position.x, 0.03, totem.group.position.z);
+        hoverSealGroup.scale.setScalar(0.95);
+        hoverSealGroup.visible = true;
         totem.badgeAnchor.getWorldPosition(_proj);
         const screen = projectWorldToScreen(_proj);
         callbacks.onHoverTargetChange({
@@ -1679,7 +2047,18 @@ export function mountDuelScene(
       const nextKey = `archon:${hitData.side}`;
       if (nextKey !== activeHoverKey) {
         activeHoverKey = nextKey;
-        const archonPos = getDemiurgeWorldPos(hitData.side);
+        const archonPos = setDemiurgeWorldPos(hitData.side, _tmpA);
+        const archonHex =
+          hitData.side === 'enemy'
+            ? 0xe85a46
+            : schoolSlotHex(latestBoardSnapshot?.playerSchool ?? 'kinet');
+        hoverSealOuterMat.color.setHex(archonHex);
+        hoverSealOuterMat.emissive.setHex(archonHex);
+        hoverSealBeamMat.color.setHex(archonHex);
+        hoverSealBeamMat.emissive.setHex(archonHex);
+        hoverSealGroup.position.set(archonPos.x, 0.04, archonPos.z);
+        hoverSealGroup.scale.setScalar(1.32);
+        hoverSealGroup.visible = true;
         archonPos.y = 1.9;
         const screen = projectWorldToScreen(archonPos);
         callbacks.onHoverTargetChange({
@@ -1693,7 +2072,7 @@ export function mountDuelScene(
   };
 
   const onPointerUp = (e: PointerEvent) => {
-    const wasDragging = isDraggingOrbit || multiTouchUsed || dragDistance > DRAG_THRESHOLD_PX;
+    const wasDragging = isDraggingOrbit || multiTouchUsed || dragDistance > getDragThresholdPx();
     const wasPrimary = e.pointerId === primaryPointerId;
     const btn = activePointers.get(e.pointerId)?.button ?? primaryButton;
     activePointers.delete(e.pointerId);
@@ -1736,11 +2115,16 @@ export function mountDuelScene(
   const onPointerLeave = () => {
     if (!isDraggingOrbit) {
       clearHoverTarget();
+      if (hoveredLane !== null) {
+        hoveredLane = null;
+        pushBadges(true);
+      }
     }
   };
 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
+    introSweepTimer = 0;
     const factor = e.deltaY > 0 ? 1.07 : 0.93;
     orbitZoomScale = THREE.MathUtils.clamp(orbitZoomScale * factor, 0.56, 1.58);
   };
@@ -1777,6 +2161,7 @@ export function mountDuelScene(
     ready: true,
     setPreset: (p: CameraPreset) => {
       currentPreset = p;
+      introSweepTimer = 0;
       orbitYawOffset = 0;
       orbitPitchOffset = 0;
       orbitZoomScale = 1;
@@ -1791,6 +2176,8 @@ export function mountDuelScene(
   let last = performance.now();
   let frameId = 0;
   let disposed = false;
+  let frameTimeEmaMs = 16.6;
+  let adaptivePerfScale = 1.0;
 
   const afterDraw = (cb: () => void) => {
     const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -1815,13 +2202,27 @@ export function mountDuelScene(
   const tick = () => {
     if (disposed) return;
     const now = performance.now();
-    const rawDt = Math.min((now - last) / 1000, 0.05);
+    const frameDeltaMs = Math.min(now - last, 120);
+    const rawDt = Math.min(frameDeltaMs / 1000, 0.05);
     last = now;
+
+    if (!isSoftwareGl && sceneMode !== 'paused') {
+      frameTimeEmaMs = frameTimeEmaMs * 0.92 + frameDeltaMs * 0.08;
+      if (frameTimeEmaMs > 28 && adaptivePerfScale > 0.62) {
+        adaptivePerfScale = Math.max(0.62, adaptivePerfScale - rawDt * 0.16);
+        arena.setPerfScale(adaptivePerfScale);
+      } else if (frameTimeEmaMs < 19 && adaptivePerfScale < 1.0) {
+        adaptivePerfScale = Math.min(1.0, adaptivePerfScale + rawDt * 0.1);
+        arena.setPerfScale(adaptivePerfScale);
+      }
+      if (warmClerestoryLight) warmClerestoryLight.intensity = 2.6 * adaptivePerfScale;
+      if (coolClerestoryLight) coolClerestoryLight.intensity = 2.2 * adaptivePerfScale;
+    }
 
     // Hitstop pauses sim ticks briefly on heavy blows while VFX/shake continue!
     if (hitstop > 0) {
       hitstop = Math.max(0, hitstop - rawDt);
-    } else if (sceneMode !== 'paused') {
+    } else if (sceneMode !== 'paused' || briefingCameraActive) {
       elapsed += rawDt;
       arena.update(elapsed, pointerNdcX, pointerNdcY);
       playerDemiurge.update(elapsed, rawDt);
@@ -1870,17 +2271,38 @@ export function mountDuelScene(
         scene.fog.density = THREE.MathUtils.damp(scene.fog.density, targetFogDensity, 6, rawDt);
       }
       rimLight.color.lerp(targetRimColor, 0.08);
-      slotVisuals.forEach((sv) => {
-        sv.sigilMat.color.lerp(sv.targetColor, 0.14);
-        sv.sigilMat.emissive.lerp(sv.targetColor, 0.14);
-        sv.sigilMat.opacity = THREE.MathUtils.damp(sv.sigilMat.opacity, sv.targetOpacity, 10, rawDt);
-        sv.ringMat.color.lerp(sv.targetColor, 0.14);
-        sv.ringMat.emissive.lerp(sv.targetColor, 0.14);
-        sv.ringMat.opacity = THREE.MathUtils.damp(sv.ringMat.opacity, sv.targetOpacity * 0.65, 10, rawDt);
+      let ringColorDirty = false;
+      slotVisuals.forEach((sv, idx) => {
+        const dr = sv.sigilMat.color.r - sv.targetColor.r;
+        const dg = sv.sigilMat.color.g - sv.targetColor.g;
+        const db = sv.sigilMat.color.b - sv.targetColor.b;
+        const colorSettled = dr * dr + dg * dg + db * db < 0.0001;
+        const opacitySettled = Math.abs(sv.sigilMat.opacity - sv.targetOpacity) < 0.002;
+        if (!colorSettled || !opacitySettled) {
+          sv.sigilMat.color.lerp(sv.targetColor, 0.14);
+          sv.sigilMat.emissive.lerp(sv.targetColor, 0.14);
+          sv.sigilMat.opacity = THREE.MathUtils.damp(sv.sigilMat.opacity, sv.targetOpacity, 10, rawDt);
+          _ringColorTmp.copy(sv.targetColor).multiplyScalar(0.35 + sv.targetOpacity * 1.15);
+          sv.curRingColor.lerp(_ringColorTmp, 0.18);
+          slotRingInstanced.setColorAt(idx, sv.curRingColor);
+          ringColorDirty = true;
+        }
         if (currentGraphicsLevel >= GRAPHICS_LEVEL.high && sv.targetOpacity > 0.3) {
           sv.sigilMesh.rotation.y += rawDt * (sv.targetOpacity > 0.6 ? 0.42 : 0.22);
         }
       });
+      if (ringColorDirty && slotRingInstanced.instanceColor) {
+        slotRingInstanced.instanceColor.needsUpdate = true;
+      }
+      if (previewBeaconGroup.visible) {
+        previewBeaconGroup.rotation.y = elapsed * 1.4;
+        previewBeaconMat.opacity = 0.36 + 0.18 * Math.sin(elapsed * 4.5);
+      }
+      if (hoverSealGroup.visible) {
+        hoverSealOuter.rotation.y = elapsed * 0.95;
+        hoverSealInner.rotation.y = -elapsed * 1.55;
+        hoverSealBeamMat.opacity = 0.17 + 0.07 * Math.sin(elapsed * 4.2);
+      }
     }
 
     curOrbitYaw = THREE.MathUtils.damp(curOrbitYaw, orbitYawOffset, 12, rawDt);
@@ -1894,6 +2316,17 @@ export function mountDuelScene(
       const titleY = THREE.MathUtils.clamp(5.2 + Math.sin(elapsed * 0.4) * 0.6 + curOrbitPitch * 5.0, 2.0, 12.0);
       _desiredPos.set(Math.sin(angle) * baseR, titleY, Math.cos(angle) * baseR);
       _desiredLook.set(0, 1.35, -0.4);
+    } else if (briefingCameraActive) {
+      // Slow ceremonial pre-match camera orbit framing the rival Archon & sanctuary
+      const angle = 0.42 + Math.sin(elapsed * 0.26) * 0.48 + curOrbitYaw;
+      const dist = (7.4 + Math.cos(elapsed * 0.19) * 0.55) * curOrbitZoom;
+      const camY = THREE.MathUtils.clamp(3.35 + Math.sin(elapsed * 0.34) * 0.32 + curOrbitPitch * 3.0, 1.8, 7.5);
+      _desiredPos.set(
+        Math.sin(angle) * dist,
+        camY,
+        -4.2 + Math.cos(angle) * dist
+      );
+      _desiredLook.set(0, 1.45, -3.55);
     } else {
       const view = PRESET_VIEWS[currentPreset];
       const lookX = view.look[0] + combatFocusX * 0.65;
@@ -1910,22 +2343,28 @@ export function mountDuelScene(
       const polar = THREE.MathUtils.clamp(basePolar + curOrbitPitch - pointerNdcY * 0.02, 0.24, 1.3);
       const rad = THREE.MathUtils.clamp(baseRadius * curOrbitZoom, 4.2, 23.0);
 
+      if (introSweepTimer > 0) {
+        introSweepTimer = Math.max(0, introSweepTimer - rawDt);
+      }
+      const sweepFactor = introSweepTimer > 0 ? Math.pow(introSweepTimer / 1.05, 2) : 0;
+
       const sinP = Math.sin(polar);
       _desiredPos.set(
-        lookX + Math.sin(az) * sinP * rad + combatFocusX * 0.45,
-        lookY + Math.cos(polar) * rad,
-        lookZ + Math.cos(az) * sinP * rad + combatFocusZ * 0.35
+        lookX + Math.sin(az) * sinP * rad + combatFocusX * 0.45 + sweepFactor * 1.4,
+        lookY + Math.cos(polar) * rad + sweepFactor * 2.1,
+        lookZ + Math.cos(az) * sinP * rad + combatFocusZ * 0.35 + sweepFactor * 2.2
       );
-      _desiredLook.set(lookX, lookY, lookZ);
+      _desiredLook.set(lookX, lookY + sweepFactor * 0.4, lookZ);
     }
 
     const lambda = 7.5;
-    _camPos.x = THREE.MathUtils.damp(_camPos.x, _desiredPos.x, lambda, rawDt);
-    _camPos.y = THREE.MathUtils.damp(_camPos.y, _desiredPos.y, lambda, rawDt);
-    _camPos.z = THREE.MathUtils.damp(_camPos.z, _desiredPos.z, lambda, rawDt);
-    _camLook.x = THREE.MathUtils.damp(_camLook.x, _desiredLook.x, lambda, rawDt);
-    _camLook.y = THREE.MathUtils.damp(_camLook.y, _desiredLook.y, lambda, rawDt);
-    _camLook.z = THREE.MathUtils.damp(_camLook.z, _desiredLook.z, lambda, rawDt);
+    const camDt = isSoftwareGl ? Math.min(frameDeltaMs / 1000, 0.25) : rawDt;
+    _camPos.x = THREE.MathUtils.damp(_camPos.x, _desiredPos.x, lambda, camDt);
+    _camPos.y = THREE.MathUtils.damp(_camPos.y, _desiredPos.y, lambda, camDt);
+    _camPos.z = THREE.MathUtils.damp(_camPos.z, _desiredPos.z, lambda, camDt);
+    _camLook.x = THREE.MathUtils.damp(_camLook.x, _desiredLook.x, lambda, camDt);
+    _camLook.y = THREE.MathUtils.damp(_camLook.y, _desiredLook.y, lambda, camDt);
+    _camLook.z = THREE.MathUtils.damp(_camLook.z, _desiredLook.z, lambda, camDt);
 
     // Trauma-squared screen shake (Ultra only)
     const shakeMag = currentGraphicsLevel >= GRAPHICS_LEVEL.ultra ? trauma * trauma * 0.28 : 0;
@@ -1940,26 +2379,25 @@ export function mountDuelScene(
     pipeline.render();
 
     if (currentGraphicsLevel >= GRAPHICS_LEVEL.ultra && targetingPreview && sceneMode === 'playing') {
-      let targetWorld: THREE.Vector3;
       if (targetingPreview.altarMode) {
-        targetWorld = getDemiurgeWorldPos('player');
+        setDemiurgeWorldPos('player', _tmpPreviewTarget);
       } else if (targetingPreview.kind === 'creature') {
         const emptyIdx = latestBoardSnapshot?.playerBoard.findIndex((c) => c === null) ?? -1;
         const laneIdx = emptyIdx >= 0 ? emptyIdx : 1;
-        targetWorld = getLaneWorldPos('player', laneIdx);
-        targetWorld.y = 0.12;
+        setLaneWorldPos('player', laneIdx, _tmpPreviewTarget);
+        _tmpPreviewTarget.y = 0.12;
       } else if (targetingPreview.kind === 'trap') {
-        targetWorld = new THREE.Vector3(0, 0.3, 3.2);
+        _tmpPreviewTarget.set(0, 0.3, 3.2);
       } else if (targetingPreview.kind === 'enchantment') {
-        targetWorld = new THREE.Vector3(-4.2, 1.35, 3.3);
+        _tmpPreviewTarget.set(-4.2, 1.35, 3.3);
       } else if (targetingPreview.kind === 'spell' && targetingPreview.targetSide === 'enemy') {
         const enemyIdx = latestBoardSnapshot?.enemyBoard.findIndex((c) => c !== null) ?? -1;
-        targetWorld =
-          enemyIdx >= 0 ? getLaneWorldPos('enemy', enemyIdx) : getDemiurgeWorldPos('enemy');
+        if (enemyIdx >= 0) setLaneWorldPos('enemy', enemyIdx, _tmpPreviewTarget);
+        else setDemiurgeWorldPos('enemy', _tmpPreviewTarget);
       } else {
-        targetWorld = getDemiurgeWorldPos('player');
+        setDemiurgeWorldPos('player', _tmpPreviewTarget);
       }
-      const targetScreen = projectWorldToScreen(targetWorld);
+      const targetScreen = projectWorldToScreen(_tmpPreviewTarget);
       vfx2d.setTargetingArc({
         sx: targetingPreview.startX,
         sy: targetingPreview.startY,
@@ -1992,19 +2430,70 @@ export function mountDuelScene(
 
   return {
     syncDuelState,
+    syncExternalState: (ext: ExternalDeviceState) => {
+      const dprChanged = isMobileMode !== ext.isMobile;
+      isMobileMode = ext.isMobile;
+      inputMode = ext.inputMode;
+      if (dprChanged) {
+        renderer.setPixelRatio(computeTargetDpr(currentGraphicsLevel));
+        renderer.setSize(width, height);
+      }
+    },
     setPreset: (preset: CameraPreset) => {
       currentPreset = preset;
+      introSweepTimer = 0;
       orbitYawOffset = 0;
       orbitPitchOffset = 0;
       orbitZoomScale = 1;
+    },
+    setBriefingCamera: (active: boolean) => {
+      briefingCameraActive = active;
     },
     setCardSelected: (selected: boolean) => {
       cardSelected = selected;
       renderer.domElement.style.cursor = selected ? 'crosshair' : 'grab';
       refreshSlotVisuals();
+      pushBadges(true);
+    },
+    setPattern: (pattern: ArcanePatternId) => {
+      activePattern = pattern;
+      const school = latestBoardSnapshot?.playerSchool ?? 'kinet';
+      const hex = schoolSlotHex(school);
+      mats.runeEmissiveMat.color.setHex(
+        pattern === 'triangle'
+          ? 0x62f2e4
+          : pattern === 'star'
+            ? 0xf4cc68
+            : pattern === 'circle'
+              ? 0x79ea74
+              : hex
+      );
+    },
+    triggerPattern: (pattern?: ArcanePatternId) => {
+      const chosen = pattern ?? activePattern;
+      activePattern = chosen;
+      const school = latestBoardSnapshot?.playerSchool ?? 'kinet';
+      const targetLane = Math.max(
+        0,
+        latestBoardSnapshot?.playerBoard.findIndex((c) => c !== null) ?? 1
+      );
+      const worldPos = setLaneWorldPos('player', targetLane, _tmpA);
+      worldPos.y = 0.25;
+      combatVfx3d.spawnPatternSigil3D(worldPos, chosen, school);
+      arena.triggerRoseFlare(school, false);
+      etherAudio.playUiSelect();
+      if (currentGraphicsLevel >= GRAPHICS_LEVEL.high) {
+        const pt = projectWorldToScreen(worldPos);
+        vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(school), 18, 200);
+      }
     },
     setTargetingPreview: (preview: TargetingPreview | null) => {
       targetingPreview = preview;
+    },
+    setPowerHoverPreview: (kind: ArchonPowerHoverKind | null, snapshot?: DuelState | null) => {
+      hoveredPowerKind = kind;
+      hoveredPowerSnapshot = snapshot ?? null;
+      refreshSlotVisuals();
     },
     triggerCardCast: (x: number, y: number, school: MagicSchool) => {
       if (currentGraphicsLevel >= GRAPHICS_LEVEL.high) {
@@ -2013,11 +2502,38 @@ export function mountDuelScene(
     },
     triggerVisualPulse: (lane = 1) => {
       if (currentGraphicsLevel >= GRAPHICS_LEVEL.high) {
-        const pt = projectWorldToScreen(getLaneWorldPos('player', lane));
+        const pt = projectWorldToScreen(setLaneWorldPos('player', lane, _tmpA));
         vfx2d.spawnBurst(pt.x, pt.y, 0, 20, 220);
       }
       for (const h of activeTotems.values()) {
         if (h.side === 'player') h.triggerJump();
+      }
+    },
+    triggerBattleStartVfx: (school: MagicSchool = 'kinet') => {
+      playerDemiurge.group.updateMatrixWorld(true);
+      enemyDemiurge.group.updateMatrixWorld(true);
+      playerDemiurge.update(elapsed, 0);
+      enemyDemiurge.update(elapsed, 0);
+      playerDemiurge.triggerCastFlare();
+      enemyDemiurge.triggerCastFlare();
+      arena.triggerRoseFlare(school, true);
+      etherAudio.playBattleStart(school);
+      const pStaff =
+        playerDemiurge.staffOriginWorld.lengthSq() > 0.01
+          ? playerDemiurge.staffOriginWorld
+          : setDemiurgeWorldPos('player', _tmpA);
+      const eStaff =
+        enemyDemiurge.staffOriginWorld.lengthSq() > 0.01
+          ? enemyDemiurge.staffOriginWorld
+          : setDemiurgeWorldPos('enemy', _tmpB);
+      combatVfx3d.spawnBattleStart3D(pStaff, eStaff, school);
+      if (currentGraphicsLevel >= GRAPHICS_LEVEL.high) {
+        const pt = projectWorldToScreen(_tmpC.set(0, 1.35, 0));
+        vfx2d.spawnBurst(pt.x, pt.y, schoolColorIndex(school), 28, 280);
+        vfx2d.triggerFlash(school === 'chaos' ? '#FF7E66' : '#F4CC68', 0.2);
+      }
+      if (currentPreset === 'combat') {
+        introSweepTimer = 1.05;
       }
     },
     dispose: () => {
@@ -2042,12 +2558,21 @@ export function mountDuelScene(
       activeTotems.clear();
       dyingTotems.forEach((d) => d.handle.dispose());
       dyingTotems.length = 0;
+      previewBeaconRingGeo.dispose();
+      previewBeaconBeamGeo.dispose();
+      previewBeaconMat.dispose();
+      hoverSealOuterGeo.dispose();
+      hoverSealInnerGeo.dispose();
+      hoverSealBeamGeo.dispose();
+      hoverSealOuterMat.dispose();
+      hoverSealBeamMat.dispose();
       slotSigilGeo.dispose();
       slotRingGeo.dispose();
       slotSigilTex.dispose();
+      slotRingInstanced.dispose();
+      slotRingInstMat.dispose();
       slotVisuals.forEach((sv) => {
         sv.sigilMat.dispose();
-        sv.ringMat.dispose();
       });
       arena.dispose();
       playerDemiurge.dispose();

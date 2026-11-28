@@ -240,6 +240,91 @@ export interface TranslationPack {
   savedRunSummary: string;
   tournamentPathLabel: string;
   careerBestStage: string;
+  lethalTag: string;
+  musicCarouselTitle: string;
+  musicAutoCarouselBadge: string;
+  musicVolumeLabel: string;
+  musicPrevTrack: string;
+  musicNextTrack: string;
+  musicPlayTrack: string;
+  musicPauseTrack: string;
+  musicModeLabel: string;
+  musicModeCarousel: string;
+  musicModeDynamic: string;
+  musicTracks: Record<'demiurge' | 'demiurge2' | 'demiurge4' | 'demiurges' | 'divine_conflict', { title: string; mood: string }>;
+  sfxSchemeLabel: string;
+  sfxSchemePreview: string;
+  sfxSchemes: Record<'cathedral' | 'forge' | 'astral' | 'cataclysm', { name: string; desc: string }>;
+  codexBtn: string;
+  titleAudioBtn: string;
+  titleSetupBtn: string;
+  sanctuaryDrawerTitle: string;
+  arcanaWheelBtn: string;
+  settingsBtn: string;
+  settingsTitle: string;
+  uiScaleLabel: string;
+  highContrastLabel: string;
+  highContrastOn: string;
+  highContrastOff: string;
+  silkLabel: string;
+  composureLabel: string;
+  minimapTitle: string;
+  patternBarLabel: string;
+  patternHoldHint: string;
+  worldPromptPlay: string;
+  worldPromptLeap: string;
+  patterns: Record<'triangle' | 'star' | 'circle' | 'decoy', { name: string; desc: string }>;
+  codex: {
+    title: string;
+    subtitle: string;
+    close: string;
+    tabs: {
+      orders: string;
+      vault: string;
+      chronicle: string;
+    };
+    ordersCleared: string;
+    bestTrialLabel: string;
+    trialCompletedCount: string;
+    noTrialYet: string;
+    discoveredCardsLabel: string;
+    discoveredRelicsLabel: string;
+    unknownCard: string;
+    lockedChapterHint: string;
+    chapters: Record<'veil_rose' | 'four_orders' | 'anomalies_cycle' | 'obsidian_oath', { title: string; text: string }>;
+    oathsTitle: string;
+    oathsMasteryLabel: string;
+    oathCompletedBadge: string;
+    oathItems: Record<
+      'oath_contracts' | 'oath_forge' | 'oath_orders' | 'oath_slayers' | 'oath_trial',
+      { title: string; desc: string }
+    >;
+  };
+  dailyTrial: {
+    title: string;
+    startBtn: string;
+    activeBadge: string;
+    dateLabel: string;
+    bestRecord: string;
+    modifiers: Record<'frail_pact' | 'ether_tide' | 'titan_vow', { name: string; desc: string }>;
+  };
+  crossroads: {
+    title: string;
+    subtitle: string;
+    hint: string;
+    pickBtn: string;
+    events: Record<'obsidian_obelisk' | 'silent_sanctuary' | 'astral_anvil' | 'sanguine_chalice', { title: string; reward: string; cost: string }>;
+  };
+  draftRivalQuotes: Record<string, string>;
+  bossCombatQuips: Record<string, string>;
+  crossSchoolSynergies: Record<'kinet' | 'vital' | 'chaos' | 'synth', { tag: string; hint: string }>;
+  questSectionLabel: string;
+  questCompletedTag: string;
+  questBonusLabel: string;
+  questTitles: Record<'summon_swarm' | 'spell_weaver' | 'aegis_bulwark' | 'pure_channel' | 'swift_verdict' | 'resonance_burst', string>;
+  questDescs: Record<'summon_swarm' | 'spell_weaver' | 'aegis_bulwark' | 'pure_channel' | 'swift_verdict' | 'resonance_burst', string>;
+  laneRuneNames: Record<'aegis' | 'surge' | 'fury', string>;
+  laneRuneDescs: Record<'aegis' | 'surge' | 'fury', string>;
   help: {
     tabs: {
       cards: string;
@@ -429,11 +514,19 @@ const EN: TranslationPack = {
     synth: 'Charges +1 per action. At 5/5 (0⚡): Deal 2 AoE DMG and grant all allies +1/+1 & Shield.',
   },
   bossPassiveNames: {
+    boss_forged_bulwark: 'Bronze Bastion',
+    boss_briar_thorns: 'Living Briar',
     boss_ember_tithe: 'Ember Tithe',
+    boss_astral_blink: 'Astral Veil',
+    boss_clockwork_mend: 'Chrono-Mend',
     boss_rift_sovereign: 'Rift Sovereign',
   },
   bossPassiveDescs: {
+    boss_forged_bulwark: 'Rival Passive: First summoned ally each turn enters with an Ether Shield.',
+    boss_briar_thorns: 'Rival Passive: Reflects 1 thorns DMG to attackers hitting Rival creatures.',
     boss_ember_tithe: 'Boss Passive: Even rounds deal 1 burn DMG & summon a 2/2 Ember Imp.',
+    boss_astral_blink: 'Rival Passive: First direct hit on the Rival Archon each turn is halved.',
+    boss_clockwork_mend: 'Rival Passive: Restores +1 HP to the Rival’s wounded vanguard each round.',
     boss_rift_sovereign: 'Boss Passive: Shifts Arena Anomaly every round & buffs vanguard +1/+1.',
   },
   logKinds: {
@@ -451,6 +544,8 @@ const EN: TranslationPack = {
     chrono: 'Chrono-Rewind',
     tether: 'Soul Tether',
     resonance: 'Apotheosis',
+    cross: 'Cross-Order',
+    rune: 'Lane Rune',
   },
   ultimatumBySchool: {
     kinet: 'Tempest Surge (<50% HP: Draw 2, Shield Flyers & Stun)',
@@ -657,6 +752,239 @@ const EN: TranslationPack = {
   savedRunSummary: 'Saved Run',
   tournamentPathLabel: 'Tournament Constellation',
   careerBestStage: 'Best Stage',
+  lethalTag: 'LETHAL',
+  musicCarouselTitle: 'Cathedral Soundtracks',
+  musicAutoCarouselBadge: 'Carousel · Subdued',
+  musicVolumeLabel: 'Music Volume',
+  musicPrevTrack: 'Previous Track',
+  musicNextTrack: 'Next Track',
+  musicPlayTrack: 'Play Music',
+  musicPauseTrack: 'Pause Music',
+  musicModeLabel: 'Playback',
+  musicModeCarousel: 'Carousel',
+  musicModeDynamic: 'Dynamic',
+  musicTracks: {
+    demiurge: {
+      title: 'Sanctum of the First Spark',
+      mood: 'Solemn arcane prelude',
+    },
+    demiurge2: {
+      title: 'Chronicle of the Archons',
+      mood: 'Measured obsidian march',
+    },
+    demiurge4: {
+      title: 'Ritual of Obsidian & Aether',
+      mood: 'Deep cathedral mystery',
+    },
+    demiurges: {
+      title: 'Ascension of the Demiurges',
+      mood: 'Rising duel crescendo',
+    },
+    divine_conflict: {
+      title: 'Divine Conflict',
+      mood: 'Clash of the immortals',
+    },
+  },
+  sfxSchemeLabel: 'SFX Pack',
+  sfxSchemePreview: 'Test SFX',
+  sfxSchemes: {
+    cathedral: { name: 'Cathedral Arcane', desc: 'Balanced temple bells & ethereal chimes' },
+    forge: { name: 'Obsidian Forge', desc: 'Sharp bronze anvils & metallic clashes' },
+    astral: { name: 'Astral Choir', desc: 'Crystalline high overtones & luminous sweeps' },
+    cataclysm: { name: 'Cataclysmic Ritual', desc: 'Deep sub-bass impacts & dark surges' },
+  },
+  codexBtn: 'Codex',
+  titleAudioBtn: 'Audio',
+  titleSetupBtn: 'Sanctuary',
+  sanctuaryDrawerTitle: 'Sanctuary Settings & Trial',
+  arcanaWheelBtn: 'Arcana',
+  settingsBtn: 'Settings',
+  settingsTitle: 'HUD & Accessibility',
+  uiScaleLabel: 'UI Scale',
+  highContrastLabel: 'High Contrast Mode',
+  highContrastOn: 'Solid Dark',
+  highContrastOff: 'Frosted',
+  silkLabel: 'Ether Silk',
+  composureLabel: 'Composure',
+  minimapTitle: 'Arena Radar',
+  patternBarLabel: 'Arcane Sigil',
+  patternHoldHint: 'Hold Q / Tab · 1-4 Sigils',
+  worldPromptPlay: '[Click] Summon Here',
+  worldPromptLeap: '[RMB] Surge Leap',
+  patterns: {
+    triangle: { name: 'Triad Lance', desc: 'Focused offensive sigil pulse' },
+    star: { name: 'Astral Star', desc: 'Radiant 8-point resonance seal' },
+    circle: { name: 'Aegis Halo', desc: 'Protective ward perimeter' },
+    decoy: { name: 'Mirage Decoy', desc: 'Illusory prism distraction' },
+  },
+  codex: {
+    title: 'Archive of Orders & Chronicle',
+    subtitle: 'Discovered Tarot spoils, Order victories, Daily Trial records & Cathedral lore',
+    close: 'Close',
+    tabs: {
+      orders: 'Orders & Trials',
+      vault: 'Tarot Vault',
+      chronicle: 'Cathedral Chronicle',
+    },
+    ordersCleared: 'Campaign Wins',
+    bestTrialLabel: 'Best Daily Trial',
+    trialCompletedCount: 'Trials Cleared',
+    noTrialYet: 'No Daily Trial completed yet',
+    discoveredCardsLabel: 'Discovered Cards',
+    discoveredRelicsLabel: 'Discovered Relics',
+    unknownCard: 'Undiscovered Seal',
+    lockedChapterHint: 'Win campaign runs to unseal this chapter (wins required: ',
+    chapters: {
+      veil_rose: {
+        title: 'I. The Rose Above the Obsidian',
+        text: 'Long before the four Orders forged their totems, the Demiurges raised the Obsidian Vault around a suspended Rose Window. Whenever an Archon bends five channels into Resonance, the stained glass remembers its ancient light.',
+      },
+      four_orders: {
+        title: 'II. Pact of the Four Orders',
+        text: 'Zephyrites claim the sky; Verdants bind wounds to bark and venom; Pyroclasts burn Ether faster than breath; Artificers trap time inside brass astrolabes. Yet a rival’s trophy card reveals how the four schools bleed into one.',
+      },
+      anomalies_cycle: {
+        title: 'III. Breath of the Rift',
+        text: 'Every three rounds the Obsidian Arena shifts its ley current — Winds, Overheat, Bronze Resonance, or Blood Conduit. Archons who refuse to read the sky fall to those who surf the anomaly.',
+      },
+      obsidian_oath: {
+        title: 'IV. Crown of the Ascendant',
+        text: 'Corvin did not seize the Crown by force; he survived every Overload until the Cathedral itself answered his call. To ascend is to carry the scars of seven duels without shattering your channel.',
+      },
+    },
+    oathsTitle: 'Cathedral Oaths',
+    oathsMasteryLabel: 'Archive Seal',
+    oathCompletedBadge: 'Sealed',
+    oathItems: {
+      oath_contracts: {
+        title: 'Oath of Obsidian Contracts',
+        desc: 'Fulfill 3 Obsidian Contracts in duel combat.',
+      },
+      oath_forge: {
+        title: 'Oath of the Star Forge',
+        desc: 'Forge cards 3 times at Sanctuary or Astral Anvil.',
+      },
+      oath_orders: {
+        title: 'Oath of Twin Orders',
+        desc: 'Win full tournament campaigns with 2 distinct Orders.',
+      },
+      oath_slayers: {
+        title: 'Oath of the Rose Gauntlet',
+        desc: 'Defeat 7 tournament rivals across runs.',
+      },
+      oath_trial: {
+        title: 'Oath of the Vigil',
+        desc: 'Complete 1 Daily Cathedral Trial.',
+      },
+    },
+  },
+  dailyTrial: {
+    title: 'Daily Cathedral Trial',
+    startBtn: 'Enter Daily Trial',
+    activeBadge: 'Daily Trial',
+    dateLabel: 'UTC Cycle',
+    bestRecord: 'Best',
+    modifiers: {
+      frail_pact: { name: 'Frail Pact', desc: 'All creatures cost -1⚡ (min 1) & enter with -1 HP (min 1).' },
+      ether_tide: { name: 'Ether Tide', desc: 'Both Archons start with +1 Ether Channel and +1 Resonance.' },
+      titan_vow: { name: 'Titan Vow', desc: 'Both Archons start with +6 Max HP.' },
+    },
+  },
+  crossroads: {
+    title: 'Cathedral Crossroads',
+    subtitle: 'Between duels, an ancient sanctum opens beneath the Rose Window',
+    hint: 'Choose one blessing to carry into the remaining tournament duels',
+    pickBtn: 'Invoke Altar',
+    events: {
+      obsidian_obelisk: {
+        title: 'Obsidian Obelisk',
+        reward: 'Gain 1 random unowned Archon Relic (or +2 Starting Resonance)',
+        cost: '-3 Max HP for this run',
+      },
+      silent_sanctuary: {
+        title: 'Silent Sanctuary',
+        reward: '+3 Max HP & purge your lowest-cost card (if deck > 8)',
+        cost: 'No draw added',
+      },
+      astral_anvil: {
+        title: 'Astral Anvil',
+        reward: 'Automatically Forge ★ a random un-maxed card in your deck',
+        cost: 'Fate picks the blade',
+      },
+      sanguine_chalice: {
+        title: 'Sanguine Chalice',
+        reward: '+2 Starting Resonance in every remaining duel',
+        cost: '-2 Max HP for this run',
+      },
+    },
+  },
+  draftRivalQuotes: {
+    s1: 'Lyra yields her sky-seal: "Speed is nothing without balance — take my wings."',
+    s2: 'Torin lowers his halberd: "Your strike cracked cast bronze. Wear this crest."',
+    s3: 'Vespera bows amidst amber thorns: "A clean cut deserves the grove’s tribute."',
+    s4: 'Ignis-Chancellor laughs through embers: "Burn the next hall with my spark!"',
+    s5: 'Magister Vael unclasps his ledger: "Calculated, yet unbowed. Take the tether."',
+    s6: 'Chronos-Forged Prime hums down: "Probability recalculated. You advance."',
+    s7: 'Archon Corvin kneels: "The Obsidian Rose answers you now, Grand Archon."',
+  },
+  bossCombatQuips: {
+    stage_0_summon_sig: 'Lyra: "Ride the high wind — strike past their shield!"',
+    stage_0_heavy_hit: 'Lyra: "That gust cut deeper than I measured…"',
+    stage_0_overload_react: 'Lyra: "Borrowing blood for Ether? Reckless, initiate!"',
+    stage_1_summon_sig: 'Torin: "Hold the bronze line! None shall pass."',
+    stage_1_heavy_hit: 'Torin: "Hmph — solid iron against solid will!"',
+    stage_1_overload_react: 'Torin: "Strike your own veins if you dare — my shield holds."',
+    stage_2_summon_sig: 'Vespera: "Taste the venom in the roots of the ring."',
+    stage_2_heavy_hit: 'Vespera: "The thorns drink, yet you press on…"',
+    stage_2_overload_react: 'Vespera: "Yes — bleed into the chalice. Let the grove bloom!"',
+    stage_3_summon_sig: 'Ignis-Chancellor: "Rise from basalt and ash — burn the board!"',
+    stage_3_heavy_hit: 'Ignis-Chancellor: "A worthy furnace! Show me hotter flame!"',
+    stage_3_overload_react: 'Ignis-Chancellor: "Hah! You burn yourself to match my pyre!"',
+    stage_4_summon_sig: 'Vael: "Every trajectory converges upon this summon."',
+    stage_4_heavy_hit: 'Vael: "An anomaly in the proof… recalibrating."',
+    stage_4_overload_react: 'Vael: "Inefficient exchange — HP cannot be forged from thin air."',
+    stage_5_summon_sig: 'Chronos Prime: "Timeline locked. Vanguard deployed."',
+    stage_5_heavy_hit: 'Chronos Prime: "Warning: structural integrity descending."',
+    stage_5_overload_react: 'Chronos Prime: "Self-inflicted entropy logged. Proceeding."',
+    stage_6_summon_sig: 'Corvin: "Behold what awaits beyond the seventh veil!"',
+    stage_6_heavy_hit: 'Corvin: "Now THIS is an Archon’s strike! Again!"',
+    stage_6_overload_react: 'Corvin: "Feed the Rift! Every drop brings Apotheosis closer!"',
+  },
+  crossSchoolSynergies: {
+    kinet: { tag: '+1⚡ & +1 Res', hint: 'Cross-Order Spark (1×/turn): +1 Ether & +1 Resonance' },
+    vital: { tag: '+2 Archon HP', hint: 'Cross-Order Spark (1×/turn): Restore +2 Archon HP' },
+    chaos: { tag: '+1 Burn DMG', hint: 'Cross-Order Spark (1×/turn): Deal 1 direct burn DMG to Rival' },
+    synth: { tag: '+Ally Shield', hint: 'Cross-Order Spark (1×/turn): Grant Shield to weakest ally' },
+  },
+  questSectionLabel: 'Obsidian Contract',
+  questCompletedTag: 'Fulfilled',
+  questBonusLabel: 'Contract Boon',
+  questTitles: {
+    summon_swarm: 'Legions of the Rose',
+    spell_weaver: 'Arcane Weaver',
+    aegis_bulwark: 'Bastion of Light',
+    pure_channel: 'Unblemished Channel',
+    swift_verdict: 'Swift Verdict',
+    resonance_burst: 'Apotheosis Rite',
+  },
+  questDescs: {
+    summon_swarm: 'Summon or Ascend 3 allied creatures in this duel.',
+    spell_weaver: 'Cast 2 Spells or Rituals during this duel.',
+    aegis_bulwark: 'Bestow Ether Shields upon 2 allies.',
+    pure_channel: 'Win the duel without using Blood Overload.',
+    swift_verdict: 'Defeat the Rival Archon by Round 6 or earlier.',
+    resonance_burst: 'Charge and unleash Archon Resonance (5/5) once.',
+  },
+  laneRuneNames: {
+    aegis: 'Aegis Rune',
+    surge: 'Ether Surge Rune',
+    fury: 'Crimson Fury Rune',
+  },
+  laneRuneDescs: {
+    aegis: 'Summoning onto this lane grants +0/+1 and an Ether Shield.',
+    surge: 'Summoning onto this lane grants +1 Ether & +1 Resonance.',
+    fury: 'Summoning onto this lane grants +2 ATK.',
+  },
   help: {
     tabs: {
       cards: 'Card Colors & Types',
@@ -726,7 +1054,8 @@ const EN: TranslationPack = {
     controlsList: [
       { keyHint: 'Drag / 1-Finger Swipe', desc: 'Orbit the 3D arena camera freely around the obsidian table.' },
       { keyHint: 'Scroll / Pinch', desc: 'Zoom camera closer to totems or pull back to tactical overview.' },
-      { keyHint: 'Keys 1 / 2 / 3', desc: 'Snap to Combat 42°, Close-Up, or Wide camera preset.' },
+      { keyHint: 'Q / Tab & 1–4', desc: 'Hold Q/Tab for the 4-sector Arcane Radial Wheel; press 1–4 for quick Sigils.' },
+      { keyHint: 'Key C / Cam Menu', desc: 'Cycle or pick Combat 42°, Close-Up, or Wide camera preset.' },
       { keyHint: 'Right-Click Lane', desc: 'Cast Surge Leap (+1 ATK & Shield) directly on an allied lane.' },
       { keyHint: 'Space / H / Esc', desc: 'Space = Overload · H or ? = Open Guide · Esc / P = Pause & Settings.' },
     ],
@@ -898,11 +1227,19 @@ const RU: TranslationPack = {
     synth: 'Заряд +1 за действие. На 5/5 (0⚡): 2 ур. всем врагам, всем союзникам +1/+1 и Щит.',
   },
   bossPassiveNames: {
+    boss_forged_bulwark: 'Бронзовый Оплот',
+    boss_briar_thorns: 'Живой Терновник',
     boss_ember_tithe: 'Подать Пепла',
+    boss_astral_blink: 'Астральная Завеса',
+    boss_clockwork_mend: 'Хроно-Починка',
     boss_rift_sovereign: 'Властелин Разлома',
   },
   bossPassiveDescs: {
+    boss_forged_bulwark: 'Пассив врага: первый призванный за ход боец входит со Щитом.',
+    boss_briar_thorns: 'Пассив врага: атакующие бойцы получают 1 урон шипами.',
     boss_ember_tithe: 'Правило босса: чётные раунды жгут 1 HP и зовут Беса 2/2.',
+    boss_astral_blink: 'Пассив врага: первый прямой удар по вражескому Архонту за ход уполовинен.',
+    boss_clockwork_mend: 'Пассив врага: в начале раунда лечит раненого авангарда на +1 HP.',
     boss_rift_sovereign: 'Правило босса: сдвигает Аномалию каждый ход и даёт +1/+1 авангарду.',
   },
   logKinds: {
@@ -920,6 +1257,8 @@ const RU: TranslationPack = {
     chrono: 'Хроно-Возврат',
     tether: 'Узы Души',
     resonance: 'Апофеоз',
+    cross: 'Синтез Орденов',
+    rune: 'Руна Линии',
   },
   ultimatumBySchool: {
     kinet: 'Ультиматум Бури (<50% HP: 2 карты, Полёт и Стан врагов)',
@@ -1126,6 +1465,239 @@ const RU: TranslationPack = {
   savedRunSummary: 'Текущий поход',
   tournamentPathLabel: 'Путь Турнира',
   careerBestStage: 'Рекорд этапа',
+  lethalTag: 'ЛЕТАЛ',
+  musicCarouselTitle: 'Хроники Собора · Музыка',
+  musicAutoCarouselBadge: 'Карусель · Приглушённо',
+  musicVolumeLabel: 'Громкость музыки',
+  musicPrevTrack: 'Предыдущий трек',
+  musicNextTrack: 'Следующий трек',
+  musicPlayTrack: 'Включить музыку',
+  musicPauseTrack: 'Пауза музыки',
+  musicModeLabel: 'Режим',
+  musicModeCarousel: 'Карусель',
+  musicModeDynamic: 'Динамика',
+  musicTracks: {
+    demiurge: {
+      title: 'Святилище Первой Искры',
+      mood: 'Торжественный эфирный прелюд',
+    },
+    demiurge2: {
+      title: 'Хроника Архонтов',
+      mood: 'Размеренный шаг судьбы',
+    },
+    demiurge4: {
+      title: 'Ритуал Обсидиана и Эфира',
+      mood: 'Глубокая храмовая мистерия',
+    },
+    demiurges: {
+      title: 'Восхождение Демиургов',
+      mood: 'Нарастающий зов дуэли',
+    },
+    divine_conflict: {
+      title: 'Божественный Конфликт',
+      mood: 'Столкновение бессмертных',
+    },
+  },
+  sfxSchemeLabel: 'Схема SFX',
+  sfxSchemePreview: 'Тест звука',
+  sfxSchemes: {
+    cathedral: { name: 'Соборный Эфир', desc: 'Гармоничные колокола и звон призыва' },
+    forge: { name: 'Кузня Обсидиана', desc: 'Звонкие металлические клинки и наковальня' },
+    astral: { name: 'Астральный Хор', desc: 'Высокие хрустальные переливы и шёпот' },
+    cataclysm: { name: 'Ритуал Катаклизма', desc: 'Тяжёлые басовые удары и грозовые разряды' },
+  },
+  codexBtn: 'Кодекс',
+  titleAudioBtn: 'Музыка',
+  titleSetupBtn: 'Настройки',
+  sanctuaryDrawerTitle: 'Настройки Святилища и Испытание',
+  arcanaWheelBtn: 'Аркана',
+  settingsBtn: 'Настройки',
+  settingsTitle: 'Настройки HUD и контраста',
+  uiScaleLabel: 'Масштаб UI',
+  highContrastLabel: 'Высокий контраст',
+  highContrastOn: 'Плотный фон',
+  highContrastOff: 'Матовое стекло',
+  silkLabel: 'Шёлк Эфира',
+  composureLabel: 'Самообладание',
+  minimapTitle: 'Радар арены',
+  patternBarLabel: 'Печать Арканы',
+  patternHoldHint: 'Удерж. Q / Tab · 1–4 Печати',
+  worldPromptPlay: '[ЛКМ] Призвать сюда',
+  worldPromptLeap: '[ПКМ] Импульс прыжка',
+  patterns: {
+    triangle: { name: 'Копьё Триады', desc: 'Направленный пробивающий импульс' },
+    star: { name: 'Астральная Звезда', desc: 'Восьмилучевой резонанс печати' },
+    circle: { name: 'Нимб Эгиды', desc: 'Защитный контур периметра' },
+    decoy: { name: 'Мираж-Приманка', desc: 'Иллюзорный преломляющий знак' },
+  },
+  codex: {
+    title: 'Архив Орденов и Хроника Собора',
+    subtitle: 'Открытые карты Таро, реликвии, победы Орденов и предания Арены',
+    close: 'Закрыть',
+    tabs: {
+      orders: 'Ордена и Испытания',
+      vault: 'Собрание Карт',
+      chronicle: 'Хроника Собора',
+    },
+    ordersCleared: 'Побед в походе',
+    bestTrialLabel: 'Лучшее Испытание дня',
+    trialCompletedCount: 'Испытаний пройдено',
+    noTrialYet: 'Испытание дня ещё не пройдено',
+    discoveredCardsLabel: 'Открыто карт',
+    discoveredRelicsLabel: 'Открыто реликвий',
+    unknownCard: 'Запечатанная карта',
+    lockedChapterHint: 'Одержите победы в походе, чтобы открыть главу (нужно побед: ',
+    chapters: {
+      veil_rose: {
+        title: 'I. Роза над Обсидианом',
+        text: 'Задолго до раскола четырёх Орденов первые Демиурги возвели Обсидиановый Зал вокруг парящего витража-розы. Когда Архонт сводит пять каналов в Резонанс, стекло отвечает древним сиянием.',
+      },
+      four_orders: {
+        title: 'II. Пакт Четырёх Орденов',
+        text: 'Зефириты владеют высотой; Верданты сплетают кору и яд; Пирокласты сжигают Эфир ради натиска; Механисты запирают время в латунных астролябиях. Трофейная карта врага соединяет их силу воедино.',
+      },
+      anomalies_cycle: {
+        title: 'III. Дыхание Разлома',
+        text: 'Каждые три раунда арена меняет русло эфира — Вихрь, Перегрев, Бронзовый Резонанс или Кровавый Проводник. Архонт, читающий небо, побеждает раньше, чем опустится клинок.',
+      },
+      obsidian_oath: {
+        title: 'IV. Венец Демиурга',
+        text: 'Корвин не взял корону силой — он пережил каждую Перегрузку, пока сам Собор не признал его волю. Пройти семь кругов значит удержать канал без единой трещины.',
+      },
+    },
+    oathsTitle: 'Клятвы Собора',
+    oathsMasteryLabel: 'Печать Архива',
+    oathCompletedBadge: 'Исполнена',
+    oathItems: {
+      oath_contracts: {
+        title: 'Клятва Обсидиановых Контрактов',
+        desc: 'Выполните 3 Обсидиановых Контракта в бою.',
+      },
+      oath_forge: {
+        title: 'Клятва Звёздной Наковальни',
+        desc: 'Закалите карты 3 раза в Святилище или Астральной Наковальне.',
+      },
+      oath_orders: {
+        title: 'Клятва Двух Орденов',
+        desc: 'Пройдите турнир до победы за 2 разных Ордена.',
+      },
+      oath_slayers: {
+        title: 'Клятва Испытания Розы',
+        desc: 'Одолейте 7 турнирных соперников за всё время.',
+      },
+      oath_trial: {
+        title: 'Клятва Ночного Бдения',
+        desc: 'Завершите 1 Испытание дня в Соборе.',
+      },
+    },
+  },
+  dailyTrial: {
+    title: 'Испытание дня',
+    startBtn: 'Войти в Испытание',
+    activeBadge: 'Испытание дня',
+    dateLabel: 'Цикл UTC',
+    bestRecord: 'Рекорд',
+    modifiers: {
+      frail_pact: { name: 'Хрупкий Пакт', desc: 'Все существа стоят на 1⚡ дешевле (мин. 1), но выходят с -1 HP (мин. 1).' },
+      ether_tide: { name: 'Прилив Эфира', desc: 'Оба Архонта начинают бой с +1 каналом Эфира и +1 Резонансом.' },
+      titan_vow: { name: 'Клятва Титана', desc: 'Оба Архонта начинают бой с +6 макс. HP.' },
+    },
+  },
+  crossroads: {
+    title: 'Перепутье Собора',
+    subtitle: 'Между поединками под витражом-розой открывается древний алтарь',
+    hint: 'Выберите одно благословение для оставшихся дуэлей турнира',
+    pickBtn: 'Воззвать к алтарю',
+    events: {
+      obsidian_obelisk: {
+        title: 'Обелиск Обсидиана',
+        reward: 'Случайная новая реликвия Архонта (или +2 стартового Резонанса)',
+        cost: '-3 макс. HP до конца похода',
+      },
+      silent_sanctuary: {
+        title: 'Тихое Святилище',
+        reward: '+3 макс. HP и очищение самой дешёвой карты колоды (если > 8 карт)',
+        cost: 'Без усиления карты',
+      },
+      astral_anvil: {
+        title: 'Астральная Наковальня',
+        reward: 'Закаливает ★ случайную карту вашей колоды до следующего уровня',
+        cost: 'Судьба выбирает клинок',
+      },
+      sanguine_chalice: {
+        title: 'Багровая Чаша',
+        reward: '+2 стартового Резонанса в каждой следующей дуэли похода',
+        cost: '-2 макс. HP до конца похода',
+      },
+    },
+  },
+  draftRivalQuotes: {
+    s1: 'Лира протягивает печать ветра: «Скорость ничто без равновесия — возьми крылья.»',
+    s2: 'Торин опускает алебарду: «Твой удар пробил литую бронзу. Возьми мой знак.»',
+    s3: 'Веспера склоняется среди шипов: «Чистая победа достойна дани рощи.»',
+    s4: 'Игнис-Канцлер смеётся сквозь пепел: «Опали следующий зал моей искрой!»',
+    s5: 'Магистр Вейл закрывает фолиант: «Расчёт верен, воля крепка. Прими узы.»',
+    s6: 'Хроно-Конструкт Прим затихает: «Вероятность пересчитана. Путь открыт.»',
+    s7: 'Архонт Корвин преклоняет колено: «Теперь Роза Обсидиана отвечает тебе, Верховный Архонт.»',
+  },
+  bossCombatQuips: {
+    stage_0_summon_sig: 'Лира: «Выше ветра — бей поверх щитов!»',
+    stage_0_heavy_hit: 'Лира: «Этот порыв рассёк защиту глубже расчёта…»',
+    stage_0_overload_react: 'Лира: «Платишь кровью за Эфир? Рискованно, новичок!»',
+    stage_1_summon_sig: 'Торин: «Сомкнуть бронзовый строй! Ни шагу назад.»',
+    stage_1_heavy_hit: 'Торин: «Крепкий удар — достойно литой стали!»',
+    stage_1_overload_react: 'Торин: «Режь свой канал, если смеешь — мой щит устоит.»',
+    stage_2_summon_sig: 'Веспера: «Попробуй яд корней янтарного круга.»',
+    stage_2_heavy_hit: 'Веспера: «Шипы пьют кровь, но ты всё ещё стоишь…»',
+    stage_2_overload_react: 'Веспера: «Да — питай круг своей кровью, пусть роща цветёт!»',
+    stage_3_summon_sig: 'Игнис-Канцлер: «Восстань из базальта и золы — сожги арену!»',
+    stage_3_heavy_hit: 'Игнис-Канцлер: «Достойное горнило! Покажи ещё жарче!»',
+    stage_3_overload_react: 'Игнис-Канцлер: «Ха! Ты сам горишь, чтобы догнать мой костёр!»',
+    stage_4_summon_sig: 'Вейл: «Все траектории сходятся на этом призыве.»',
+    stage_4_heavy_hit: 'Вейл: «Отклонение в уравнении… пересчёт.»',
+    stage_4_overload_react: 'Вейл: «Невыгодный обмен — кровь не вернуть формулой.»',
+    stage_5_summon_sig: 'Хроно-Прим: «Временная линия зафиксирована. Авангард в строю.»',
+    stage_5_heavy_hit: 'Хроно-Прим: «Внимание: целостность канала снижается.»',
+    stage_5_overload_react: 'Хроно-Прим: «Добровольная энтропия зафиксирована.»',
+    stage_6_summon_sig: 'Корвин: «Узри, что таится за седьмым витражом!»',
+    stage_6_heavy_hit: 'Корвин: «Вот ЭТО — удар истинного Архонта! Ещё!»',
+    stage_6_overload_react: 'Корвин: «Питай Разлом! Каждая капля приближает Апофеоз!»',
+  },
+  crossSchoolSynergies: {
+    kinet: { tag: '+1⚡ и +1 Рез.', hint: 'Синтез Орденов (1×/ход): +1 Эфир и +1 Резонанс' },
+    vital: { tag: '+2 HP Архонту', hint: 'Синтез Орденов (1×/ход): Лечит Архонту +2 HP' },
+    chaos: { tag: '+1 Ожог врагу', hint: 'Синтез Орденов (1×/ход): 1 прямой урон вражескому Архонту' },
+    synth: { tag: '+Щит союзнику', hint: 'Синтез Орденов (1×/ход): Щит слабейшему союзнику' },
+  },
+  questSectionLabel: 'Обсидиановый Контракт',
+  questCompletedTag: 'Выполнен',
+  questBonusLabel: 'Дар Контракта',
+  questTitles: {
+    summon_swarm: 'Легион Розы',
+    spell_weaver: 'Ткач Арканы',
+    aegis_bulwark: 'Оплот Света',
+    pure_channel: 'Чистый Канал',
+    swift_verdict: 'Быстрый Приговор',
+    resonance_burst: 'Обряд Апофеоза',
+  },
+  questDescs: {
+    summon_swarm: 'Призовите или слейте 3 союзных существ за эту дуэль.',
+    spell_weaver: 'Разыграйте 2 Заклинания или Ритуала за дуэль.',
+    aegis_bulwark: 'Наложите Эфирный щит на 2 союзников за дуэль.',
+    pure_channel: 'Победите в дуэли, ни разу не применив Перегрузку.',
+    swift_verdict: 'Одержите победу до 6-го раунда включительно.',
+    resonance_burst: 'Накопите и активируйте Резонанс Архонта (5/5).',
+  },
+  laneRuneNames: {
+    aegis: 'Руна Эгиды',
+    surge: 'Руна Потока Эфира',
+    fury: 'Руна Багровой Ярости',
+  },
+  laneRuneDescs: {
+    aegis: 'Призыв на эту линию даёт существу +0/+1 и Эфирный Щит.',
+    surge: 'Призыв на эту линию даёт +1 Эфира и +1 Резонанса.',
+    fury: 'Призыв на эту линию даёт существу +2 АТК.',
+  },
   help: {
     tabs: {
       cards: 'Цвета и типы карт',
@@ -1195,7 +1767,8 @@ const RU: TranslationPack = {
     controlsList: [
       { keyHint: 'Мышь / Свайп', desc: 'Вращайте 3D-сцену арены на любой удобный угол обзора.' },
       { keyHint: 'Колёсико / Щипок', desc: 'Приближайте и отдаляйте камеру от тотемов и алтарей.' },
-      { keyHint: 'Клавиши 1 / 2 / 3', desc: 'Быстрые ракурсы: Боевая 42°, Крупно, Общий план.' },
+      { keyHint: 'Q / Tab и 1–4', desc: 'Удерживайте Q или Tab для радиального колеса Арканы; 1–4 — быстрые печати.' },
+      { keyHint: 'Клавиша C / Камера', desc: 'Переключение ракурсов: Боевая 42°, Крупно, Общий план.' },
       { keyHint: 'ПКМ по линии', desc: 'Мгновенный Импульс прыжка (+1 АТК и Щит) на союзную линию.' },
       { keyHint: 'Пробел / H / Esc', desc: 'Пробел = Перегрузка · H или ? = Справка · Esc / P = Меню и настройки.' },
     ],
@@ -1229,6 +1802,18 @@ type PartialTranslation = Partial<
     | 'resonanceDescBySchool'
     | 'orderDoctrines'
     | 'sanctuaryModes'
+    | 'codex'
+    | 'dailyTrial'
+    | 'crossroads'
+    | 'draftRivalQuotes'
+    | 'bossCombatQuips'
+    | 'crossSchoolSynergies'
+    | 'questTitles'
+    | 'questDescs'
+    | 'laneRuneNames'
+    | 'laneRuneDescs'
+    | 'sfxSchemes'
+    | 'patterns'
     | 'help'
   >
 >;

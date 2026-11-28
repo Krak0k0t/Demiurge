@@ -1,0 +1,84 @@
+Роль: Ты — Senior WebGL/React Developer. Твоя задача — переработать UI/UX слой для игры
+Стек: React, TypeScript, Tailwind CSS, Vite, Three.js (vanilla).
+Архитектура (ВАЖНО): У нас есть изолированный "мост". Three.js рендерит сцену в canvasMountRef. React управляет HUD. Общение идет через engineRef.current (React -> 3D) и коллбэки onHudUpdate, onInteract (3D -> React). Категорически запрещено пересоздавать сцену Three.js при обновлении состояния React.
+
+Задача: Реализовать адаптивный HUD (для ПК и мобилок), который не перекрывает обзор и выглядит органично. Использовать Tailwind для стилизации и React-хуки для логики.
+1. Управление состоянием и платформой (App.tsx / Hooks)
+
+    Создай кастомный хук useDeviceType(). Он должен определять наличие тач-событий ('ontouchstart' in window) или ширину экрана. Возвращать 'mobile' | 'desktop'.
+
+    Добавь в глобальный стейт (Context или Zustand) переменные:
+
+        uiScale: number (по умолчанию 1).
+
+        isHighContrast: boolean.
+
+        selectedPattern: 'triangle' | 'star' | 'circle' | 'decoy'.
+
+    Обеспечь передачу selectedPattern в Three.js через engineRef.current.setPattern() (или аналогичный метод).
+
+2. HUD Компоненты (React + Tailwind)
+
+A. Top-Left (Stats & Quest):
+
+    Silk Bar: Компонент <SilkBar />. Используй Tailwind (bg-cyan-400/50, backdrop-blur-md). Анимируй ширину через style={{ width: \${(silk/160)*100}%` }}с CSStransition-all duration-300`. Добавь класс для "тряски" при уроне (CSS keyframes).
+
+    Composure: Массив из 3 иконок-капель. Используй SVG или Lucide-react.
+
+    Quest Tracker: Компонент с useEffect для эффекта печатной машинки (Typewriter). Обязательно наложи drop-shadow-md и text-shadow на текст для читаемости на фоне 3D.
+
+    Стиль: Плашка должна иметь bg-black/70 backdrop-blur-sm rounded-xl p-4.
+
+B. Top-Right (System Menu):
+
+    Кнопки Menu, Settings, Sound. При наведении (hover:scale-110 active:scale-95 transition-transform) и легком фоновом свечении. Используй стилизованные SVG-иконки.
+
+C. Bottom-Right (Web Pattern Menu) — КРИТИЧНО:
+
+    ПК (Radial Menu): Создай компонент <RadialMenu />. Он рендерится абсолютно спозиционированным (fixed). Появляется при keydown клавиши Q или Tab. Центр — координаты мыши. Вокруг 4 сектора (SVG path). При отпускании клавиши — вызов engineRef.current.triggerPattern().
+
+    Авто-скрытие (Исчезновение): Если Radial Menu не используется, сделай горизонтальную панель. Состояние isVisible (true/false). Если игрок нажал 1-4, панель появляется. Запускается таймер setTimeout(1500), который делает isVisible = false. При isVisible === false применяй Tailwind классы opacity-0 pointer-events-none transition-opacity duration-500.
+
+    Мобилки: Кнопка-триггер в правом нижнем углу. По тапу открывается вертикальное меню (Bottom Sheet) с большими кнопками (удобно для пальца).
+
+D. Bottom-Left (Dialogue & Minimap):
+
+    Minimap: Круглый div с overflow-hidden, внутри React-компоненты, отображающие точки. Данные для точек приходят через onHudUpdate.
+
+    Dialogue Box: На ПК — fixed bottom-4 left-4. На мобилках — fixed top-20 left-1/2 -translate-x-1/2 (чтобы не перекрывать зону больших пальцев).
+
+3. World-Space UI (Подсказки над объектами)
+
+    Вместо текста в углу экрана, подсказки [E] Stretch silk должны летать над ветками.
+
+    Реализация: Поскольку UI на React, используй проекцию 3D-координат в 2D экранные.
+
+    В SceneEngine при движении камеры обновляй координаты нужных объектов. Через коллбэк onWorldPromptUpdate(screenX, screenY, text) передавай их в React.
+
+    В React рендери компонент <WorldPrompt /> с position: absolute; left: {screenX}px; top: {screenY}px;, который плавно следует за объектом.
+
+4. Настройки (Settings Menu)
+
+    Слайдер UI Scale (0.8 - 1.5). Применяй его через CSS-переменную style={{ '--ui-scale': uiScale }} в корневом <div>, а элементы HUD пусть используют transform: scale(var(--ui-scale)) или calc() в Tailwind.
+
+    Тумблер High Contrast Mode. При включении добавляет класс high-contrast к body, который переопределяет прозрачность фонов (bg-black вместо bg-black/70).
+
+Ожидаемый результат от ИИ:
+
+    Напиши хук useDeviceType и useAutoHide (для исчезающего меню).
+
+    Напиши код компонентов SilkBar, RadialMenu (с обработкой кликов по секторам), WorldPrompt (с логикой следования за 3D-объектом).
+
+    Напиши TypeScript интерфейсы для пропсов (например, interface HUDProps { silk: number; composure: number; }).
+
+    Покажи, как правильно вызвать engineRef.current.setPattern('star') из React-кнопки, не вызывая лишних перерисовок React-компонентов.
+
+Пару советов для вас лично (не для ИИ):
+
+    Про "исчезающую" панель: В React это делается элементарно. Заведите const [showPatterns, setShowPatterns] = useState(false). В useEffect слушайте нажатия клавиш. Как только игрок нажал 1-4, делаете setShowPatterns(true) и запускаете setTimeout(() => setShowPatterns(false), 1500). И вешаете на контейнер меню класс transition-opacity ${showPatterns ? 'opacity-100' : 'opacity-0'}. И всё — она будет красиво растворятся в воздухе, а не висеть полупрозрачным пятном.
+
+    Radial Menu (Колесо): На чистом React + SVG это делается очень легко. Это спасет ваш геймплей. Игрок зажал Tab, мышка в центр, крутанул — выбрал. Глаз не цепляется за статичные кнопки внизу.
+
+    Шрифты: В Tailwind CSS используйте классы drop-shadow-md и tracking-wide для текста HUD. Они творят чудеса с читаемостью на темном 3D-фоне.
+
+    Связь React -> Three.js: Поскольку вы используете onHudUpdate (Three.js -> React), убедитесь, что вы не делаете setState на каждый кадр requestAnimationFrame (60 раз в секунду). Это убьет производительность React. Обновляйте HUD только при реальном изменении значений (например, if (newSilk !== oldSilk) onHudUpdate(...)).

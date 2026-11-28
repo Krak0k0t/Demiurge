@@ -35,6 +35,70 @@ function makeLathe(coords: Array<[number, number]>, segments = 12): THREE.LatheG
   );
 }
 
+interface SharedTotemStaticGeos {
+  colliderGeo: THREE.CylinderGeometry;
+  shadowGeo: THREE.PlaneGeometry;
+  baseGeo: Record<DetailTier, THREE.LatheGeometry>;
+  plinthTrimGeo: Record<1 | 2, THREE.TorusGeometry>;
+  inlayRingGeo: THREE.RingGeometry;
+  studGeo: THREE.OctahedronGeometry;
+  vetGeo: THREE.TorusGeometry;
+  vetPointGeo: THREE.ConeGeometry;
+  vetPlinthRingGeo: THREE.TorusGeometry;
+  shieldRingGeo: THREE.RingGeometry;
+  guardArcGeo: THREE.RingGeometry;
+}
+
+let cachedStaticGeos: SharedTotemStaticGeos | null = null;
+
+function getSharedTotemStaticGeos(): SharedTotemStaticGeos {
+  if (cachedStaticGeos) return cachedStaticGeos;
+  const plinthCoords: Array<[number, number]> = [
+    [0.0, 0.0],
+    [0.54, 0.0],
+    [0.5, 0.05],
+    [0.44, 0.09],
+    [0.0, 0.09],
+  ];
+  const trimMed = new THREE.TorusGeometry(0.455, 0.016, 6, 12);
+  trimMed.rotateX(Math.PI / 2);
+  const trimHigh = new THREE.TorusGeometry(0.455, 0.016, 6, 20);
+  trimHigh.rotateX(Math.PI / 2);
+  const inlayRingGeo = new THREE.RingGeometry(0.32, 0.37, 20);
+  inlayRingGeo.rotateX(-Math.PI / 2);
+  const vetPlinthRingGeo = new THREE.TorusGeometry(0.555, 0.013, 6, 20);
+  vetPlinthRingGeo.rotateX(Math.PI / 2);
+  const shieldRingGeo = new THREE.RingGeometry(0.6, 0.67, 28);
+  shieldRingGeo.rotateX(-Math.PI / 2);
+  const guardArcGeo = new THREE.RingGeometry(0.42, 0.52, 16, 1, -Math.PI * 0.42, Math.PI * 0.84);
+  guardArcGeo.rotateX(-Math.PI / 2);
+  guardArcGeo.rotateY(-Math.PI / 2);
+
+  const built: SharedTotemStaticGeos = {
+    colliderGeo: new THREE.CylinderGeometry(0.56, 0.62, 1.75, 8),
+    shadowGeo: new THREE.PlaneGeometry(1.65, 1.65),
+    baseGeo: {
+      0: makeLathe(plinthCoords, 8),
+      1: makeLathe(plinthCoords, 12),
+      2: makeLathe(plinthCoords, 16),
+      3: makeLathe(plinthCoords, 20),
+    },
+    plinthTrimGeo: {
+      1: trimMed,
+      2: trimHigh,
+    },
+    inlayRingGeo,
+    studGeo: new THREE.OctahedronGeometry(0.026, 0),
+    vetGeo: new THREE.TorusGeometry(0.32, 0.022, 6, 24),
+    vetPointGeo: new THREE.ConeGeometry(0.038, 0.12, 4),
+    vetPlinthRingGeo,
+    shieldRingGeo,
+    guardArcGeo,
+  };
+  cachedStaticGeos = built;
+  return built;
+}
+
 /** Creates a forged, beveled flat sword/scimitar blade with crossguard and hilt grip */
 function createForgedBlade(
   bladeMat: THREE.Material,
@@ -273,9 +337,9 @@ export function buildCreatureTotem(
           ? mats.vitalAmberMat
           : mats.runeEmissiveMat;
 
+  const shared = getSharedTotemStaticGeos();
+
   // Invisible hit volume for 3D Hover Stat Inspector raycasting
-  const colliderGeo = new THREE.CylinderGeometry(0.56, 0.62, 1.75, 8);
-  geometries.push(colliderGeo);
   const colliderMat = new THREE.MeshStandardMaterial({
     colorWrite: false,
     depthWrite: false,
@@ -283,14 +347,12 @@ export function buildCreatureTotem(
     metalness: 0,
   });
   customMats.push(colliderMat);
-  const hitCollider = new THREE.Mesh(colliderGeo, colliderMat);
+  const hitCollider = new THREE.Mesh(shared.colliderGeo, colliderMat);
   hitCollider.position.set(0, 0.9, 0);
   hitCollider.userData.hoverTarget = { kind: 'creature', uid: id };
   group.add(hitCollider);
 
   // Soft radial contact shadow
-  const shadowGeo = new THREE.PlaneGeometry(1.65, 1.65);
-  geometries.push(shadowGeo);
   const shadowMat = new THREE.MeshStandardMaterial({
     map: contactTex,
     color: 0x000000,
@@ -301,49 +363,31 @@ export function buildCreatureTotem(
     opacity: 0.72,
   });
   customMats.push(shadowMat);
-  const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+  const shadow = new THREE.Mesh(shared.shadowGeo, shadowMat);
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.02;
   group.add(shadow);
 
-  // Carved antique pedestal disc (LOD-scaled)
-  const baseGeo = makeLathe(
-    [
-      [0.0, 0.0],
-      [0.54, 0.0],
-      [0.5, 0.05],
-      [0.44, 0.09],
-      [0.0, 0.09],
-    ],
-    detailLevel >= 2 ? 16 : detailLevel === 1 ? 12 : 8
-  );
-  geometries.push(baseGeo);
-  const base = new THREE.Mesh(baseGeo, mats.darkBronzeMat);
+  // Carved antique pedestal disc (LOD-scaled, cached geometry)
+  const base = new THREE.Mesh(shared.baseGeo[detailLevel], mats.darkBronzeMat);
   base.castShadow = true;
   base.receiveShadow = true;
   group.add(base);
 
   if (detailLevel >= 1) {
-    const plinthTrimGeo = new THREE.TorusGeometry(0.455, 0.016, 6, detailLevel >= 2 ? 20 : 12);
-    plinthTrimGeo.rotateX(Math.PI / 2);
-    geometries.push(plinthTrimGeo);
-    const plinthTrim = new THREE.Mesh(plinthTrimGeo, mats.goldMat);
+    const plinthTrim = new THREE.Mesh(shared.plinthTrimGeo[detailLevel >= 2 ? 2 : 1], mats.goldMat);
     plinthTrim.position.y = 0.088;
     group.add(plinthTrim);
   }
 
   if (detailLevel >= 2) {
-    const inlayRingGeo = new THREE.RingGeometry(0.32, 0.37, 20);
-    inlayRingGeo.rotateX(-Math.PI / 2);
-    const studGeo = new THREE.OctahedronGeometry(0.026, 0);
-    geometries.push(inlayRingGeo, studGeo);
-    const inlayRing = new THREE.Mesh(inlayRingGeo, schoolGlowMat);
+    const inlayRing = new THREE.Mesh(shared.inlayRingGeo, schoolGlowMat);
     inlayRing.position.y = 0.094;
     group.add(inlayRing);
 
     for (let i = 0; i < 8; i++) {
       const a = (i * Math.PI) / 4;
-      const stud = new THREE.Mesh(studGeo, mats.goldMat);
+      const stud = new THREE.Mesh(shared.studGeo, mats.goldMat);
       stud.position.set(Math.cos(a) * 0.48, 0.065, Math.sin(a) * 0.48);
       group.add(stud);
     }
@@ -1719,25 +1763,68 @@ export function buildCreatureTotem(
     }
   }
 
-  // Royal 4-Point Veteran / Ascended Aura Crown
-  const vetGeo = new THREE.TorusGeometry(0.32, 0.022, 6, 24);
-  const vetPointGeo = new THREE.ConeGeometry(0.038, 0.12, 4);
-  geometries.push(vetGeo, vetPointGeo);
-  const vetMat = new THREE.MeshStandardMaterial({
+  // Wrap detailed body parts into THREE.LOD (level 0: full sculpt; level 1 at >= 18.5 units: crisp tactical silhouette proxy)
+  const detailRig = new THREE.Group();
+  while (animPivot.children.length > 0) {
+    detailRig.add(animPivot.children[0]);
+  }
+
+  const silhouetteRig = new THREE.Group();
+  const silArmorMat =
+    school === 'kinet'
+      ? mats.royalIndigoClothMat
+      : school === 'chaos'
+        ? mats.crimsonArmorMat
+        : school === 'vital'
+          ? mats.emeraldArmorMat
+          : mats.bluedSteelMat;
+
+  const silTorsoGeo = new THREE.CylinderGeometry(0.16, 0.22, 0.72, 6);
+  const silHeadGeo = new THREE.OctahedronGeometry(0.15, 0);
+  const silCoreGeo = new THREE.OctahedronGeometry(0.09, 0);
+  const silWingGeo = new THREE.BoxGeometry(0.46, 0.24, 0.04);
+  geometries.push(silTorsoGeo, silHeadGeo, silCoreGeo, silWingGeo);
+
+  const silTorso = new THREE.Mesh(silTorsoGeo, silArmorMat);
+  silTorso.position.y = 0.48;
+  silTorso.castShadow = true;
+
+  const silHead = new THREE.Mesh(silHeadGeo, mats.goldMat);
+  silHead.position.y = 1.02;
+  silHead.castShadow = true;
+
+  const silCore = new THREE.Mesh(silCoreGeo, schoolGlowMat);
+  silCore.position.set(0, 0.56, 0.19);
+
+  const silCrest = new THREE.Mesh(silWingGeo, mats.goldMat);
+  silCrest.position.set(0, 0.68, -0.14);
+
+  silhouetteRig.add(silTorso, silHead, silCore, silCrest);
+
+  const bodyLod = new THREE.LOD();
+  bodyLod.addLevel(detailRig, 0);
+  bodyLod.addLevel(silhouetteRig, 18.5);
+  animPivot.add(bodyLod);
+
+  // Royal 4-Point Veteran / Ascended Aura Crown + 3 Gold Plinth Rank Rings
+  const vetMat = new THREE.MeshPhysicalMaterial({
     color: TAROT_PALETTE.gold,
-    metalness: 0.85,
-    roughness: 0.25,
+    metalness: 0.88,
+    roughness: 0.22,
+    anisotropy: 0.5,
+    clearcoat: 0.55,
+    clearcoatRoughness: 0.16,
     emissive: 0x5c4212,
     emissiveIntensity: 0.35,
   });
   customMats.push(vetMat);
   const vetHalo = new THREE.Group();
-  const vetRingMesh = new THREE.Mesh(vetGeo, vetMat);
+  const vetRingMesh = new THREE.Mesh(shared.vetGeo, vetMat);
   vetRingMesh.rotation.x = Math.PI / 2;
   vetHalo.add(vetRingMesh);
   for (let p = 0; p < 4; p++) {
     const a = (p * Math.PI) / 2;
-    const spire = new THREE.Mesh(vetPointGeo, vetMat);
+    const spire = new THREE.Mesh(shared.vetPointGeo, vetMat);
     spire.position.set(Math.cos(a) * 0.32, 0.06, Math.sin(a) * 0.32);
     vetHalo.add(spire);
   }
@@ -1745,43 +1832,50 @@ export function buildCreatureTotem(
   vetHalo.visible = false;
   animPivot.add(vetHalo);
 
+  const vetPlinthRings: THREE.Mesh[] = [];
+  for (let r = 0; r < 3; r++) {
+    const ring = new THREE.Mesh(shared.vetPlinthRingGeo, vetMat);
+    ring.position.y = 0.025 + r * 0.026;
+    ring.scale.setScalar(1.0 - r * 0.045);
+    ring.visible = false;
+    group.add(ring);
+    vetPlinthRings.push(ring);
+  }
+
   // Shield Aura Ring
-  const shieldRingGeo = new THREE.RingGeometry(0.6, 0.67, 28);
-  shieldRingGeo.rotateX(-Math.PI / 2);
-  geometries.push(shieldRingGeo);
-  const shieldRingMat = new THREE.MeshStandardMaterial({
+  const shieldRingMat = new THREE.MeshPhysicalMaterial({
     color: 0x1e4c47,
     emissive: TAROT_PALETTE.ether,
     emissiveIntensity: 1.2,
-    roughness: 0.25,
-    metalness: 0.1,
+    roughness: 0.18,
+    metalness: 0.12,
+    clearcoat: 0.72,
+    clearcoatRoughness: 0.14,
     transparent: true,
     opacity: 0.6,
     side: THREE.DoubleSide,
   });
   customMats.push(shieldRingMat);
-  const shieldRing = new THREE.Mesh(shieldRingGeo, shieldRingMat);
+  const shieldRing = new THREE.Mesh(shared.shieldRingGeo, shieldRingMat);
   shieldRing.position.y = 0.04;
   shieldRing.visible = false;
   group.add(shieldRing);
 
   // Guard Stance Protective Front Arc + High/Ultra Translucent Energy Barrier
-  const guardArcGeo = new THREE.RingGeometry(0.42, 0.52, 16, 1, -Math.PI * 0.42, Math.PI * 0.84);
-  guardArcGeo.rotateX(-Math.PI / 2);
-  guardArcGeo.rotateY(-Math.PI / 2);
-  geometries.push(guardArcGeo);
-  const guardArcMat = new THREE.MeshStandardMaterial({
+  const guardArcMat = new THREE.MeshPhysicalMaterial({
     color: 0x285f70,
     emissive: 0x7be3ff,
     emissiveIntensity: 1.25,
-    roughness: 0.22,
-    metalness: 0.1,
+    roughness: 0.18,
+    metalness: 0.12,
+    clearcoat: 0.72,
+    clearcoatRoughness: 0.14,
     transparent: true,
     opacity: 0.72,
     side: THREE.DoubleSide,
   });
   customMats.push(guardArcMat);
-  const guardArc = new THREE.Mesh(guardArcGeo, guardArcMat);
+  const guardArc = new THREE.Mesh(shared.guardArcGeo, guardArcMat);
   guardArc.position.set(0, 0.055, 0.14);
   guardArc.visible = false;
   group.add(guardArc);
@@ -1844,11 +1938,13 @@ export function buildCreatureTotem(
   let deathTimer = 0;
   const deathFadeMats: Array<{ mat: THREE.Material; baseOpacity: number }> = [];
   let currentStance: 'attack' | 'guard' = 'attack';
+  let stanceBraceYaw = 0;
+  let stanceDropY = 0;
   let isExhausted = false;
   const deathSpinDir = side === 'player' ? 1 : -1;
 
-  const SPAWN_DURATION = 0.5;
-  const DEATH_DURATION = 0.6;
+  const SPAWN_DURATION = 0.52;
+  const DEATH_DURATION = 0.68;
   const ATTACK_WINDUP = 0.2;
   const ATTACK_DASH = 0.1;
   const ATTACK_RETURN = 0.2;
@@ -1939,6 +2035,9 @@ export function buildCreatureTotem(
     },
     setVeteran: (count: number) => {
       vetHalo.visible = count > 0;
+      for (let i = 0; i < vetPlinthRings.length; i++) {
+        vetPlinthRings[i].visible = count > i;
+      }
     },
     setShielded: (shielded: boolean) => {
       shieldRing.visible = shielded;
@@ -1955,14 +2054,16 @@ export function buildCreatureTotem(
       if (dying) {
         deathTimer += safeDt;
         const p = Math.min(1, deathTimer / DEATH_DURATION);
-        const fade = Math.max(0, 1 - p);
-        const s = Math.max(0.05, 1 - p * 0.55);
+        const fade = Math.max(0, 1 - p * p);
+        const spiritLift = Math.sin(Math.min(1, p * 2.2) * Math.PI) * 0.24;
+        const s = Math.max(0.04, 1 - p * 0.64);
         group.scale.set(1, 1, 1);
-        animPivot.scale.set(s, s * (1 - p * 0.25), s);
-        animPivot.position.y = 0.09 - p * 0.34;
-        animPivot.position.z = THREE.MathUtils.damp(animPivot.position.z, -0.52, 8, safeDt);
-        animPivot.rotation.x = -p * 1.25;
-        animPivot.rotation.z = deathSpinDir * p * 0.72;
+        animPivot.scale.set(s, s * (1 + p * 0.15), s);
+        animPivot.position.y = 0.09 + spiritLift - p * 0.36;
+        animPivot.position.z = THREE.MathUtils.damp(animPivot.position.z, -0.42, 8, safeDt);
+        animPivot.rotation.x = -p * 1.05;
+        animPivot.rotation.y += deathSpinDir * safeDt * 4.5;
+        animPivot.rotation.z = deathSpinDir * p * 0.62;
         for (let i = 0; i < deathFadeMats.length; i++) {
           const entry = deathFadeMats[i];
           entry.mat.opacity = entry.baseOpacity * fade;
@@ -1992,8 +2093,20 @@ export function buildCreatureTotem(
         hitShake = Math.max(0, hitShake - safeDt);
       }
 
-      const restZ = currentStance === 'guard' ? -0.14 : 0;
-      const restTilt = isExhausted ? -0.22 : currentStance === 'guard' ? -0.06 : 0.04;
+      const restZ = currentStance === 'guard' ? -0.14 : 0.04;
+      const restTilt = isExhausted ? -0.22 : currentStance === 'guard' ? -0.09 : 0.08;
+      stanceBraceYaw = THREE.MathUtils.damp(
+        stanceBraceYaw,
+        currentStance === 'guard' ? 0.26 : 0,
+        10,
+        safeDt
+      );
+      stanceDropY = THREE.MathUtils.damp(
+        stanceDropY,
+        currentStance === 'guard' ? -0.045 : 0,
+        10,
+        safeDt
+      );
 
       if (attackActive) {
         attackElapsed += safeDt * attackSpeed;
@@ -2044,7 +2157,7 @@ export function buildCreatureTotem(
       const groupAppear = Math.max(0.01, spawnEase);
       group.scale.set(groupAppear, groupAppear, groupAppear);
 
-      const targetScaleY = currentStance === 'guard' ? 0.94 : 1.0;
+      const targetScaleY = currentStance === 'guard' ? 0.92 : 1.02;
       if (!attackActive) {
         scaleY = THREE.MathUtils.damp(scaleY, targetScaleY, 10, safeDt);
       }
@@ -2056,7 +2169,11 @@ export function buildCreatureTotem(
       const bob = Math.sin(time * 2.0 + phaseOffset) * 0.04;
       const spawnGroundRise = spawnTimer > 0 ? (1 - spawnEase) * -0.28 : 0;
       animPivot.position.y =
-        0.09 + jumpHeight + spawnGroundRise + (school === 'kinet' && !isExhausted ? bob + 0.06 : bob * 0.25);
+        0.09 +
+        stanceDropY +
+        jumpHeight +
+        spawnGroundRise +
+        (school === 'kinet' && !isExhausted ? bob + 0.06 : bob * 0.25);
       const recoilX = hitShake > 0 ? Math.sin(hitShake * 62) * (hitShake / 0.28) * 0.1 : 0;
       animPivot.position.x = lungeX + recoilX;
       animPivot.position.z = lungeZ;
@@ -2064,7 +2181,8 @@ export function buildCreatureTotem(
       const spinOffset =
         (spawnTimer > 0 ? (1 - spawnEase) * Math.PI * 0.5 : 0) +
         (ascendTimer > 0 ? (ascendTimer / 0.52) * Math.PI * 2 : 0);
-      animPivot.rotation.y = Math.sin(time * 0.85 + phaseOffset) * 0.06 + spinOffset + lungeYawOffset;
+      animPivot.rotation.y =
+        Math.sin(time * 0.85 + phaseOffset) * 0.06 + spinOffset + lungeYawOffset + stanceBraceYaw;
       animPivot.rotation.z = hitShake > 0 ? Math.sin(hitShake * 48) * (hitShake / 0.28) * 0.14 : 0;
 
       const flap = Math.sin(time * 5.0 + phaseOffset) * 0.28;

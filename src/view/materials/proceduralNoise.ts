@@ -434,3 +434,181 @@ export function createFoliageAlphaTextures(
 
   return { map, normalMap, roughnessMap };
 }
+
+/**
+ * Generates anisotropic brushed metal + battle micro-scratches + pitting maps:
+ * - normalMap: fine directional grain + diagonal micro-scratches
+ * - roughnessMap: wear contrast along scratch trenches & polished bevel ridges
+ * - clearcoatNormalMap: crisp topcoat micro-scratches for MeshPhysicalMaterial clearcoat
+ */
+export function createMicroScratchTextures(
+  seed: number,
+  options: {
+    size?: number;
+    scratchCount?: number;
+    maxAnisotropy: number;
+    repeat?: number;
+    strength?: number;
+  }
+): {
+  normalMap: THREE.CanvasTexture;
+  roughnessMap: THREE.CanvasTexture;
+  clearcoatNormalMap: THREE.CanvasTexture;
+} {
+  const size = options.size ?? 256;
+  const scratchCount = options.scratchCount ?? 130;
+  const repeat = options.repeat ?? 2;
+  const rng = createRng(seed + 1301);
+  const perlin = new Perlin2D(seed + 1302);
+
+  const heights = new Float32Array(size * size);
+  const clearHeights = new Float32Array(size * size);
+
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = size;
+  roughCanvas.height = size;
+  const rCtx = roughCanvas.getContext('2d')!;
+  const rImg = rCtx.createImageData(size, size);
+  const rData = rImg.data;
+
+  // Base brushed anisotropic grain + fine Perlin patina
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const grain = perlin.fbmTiled((u * 1.0) % 1, (v * 6.0) % 1, 8, 3);
+      const patina = perlin.fbmTiled(u, v, 5, 4);
+      const h = 0.56 + (grain - 0.5) * 0.24 + (patina - 0.5) * 0.14;
+      heights[y * size + x] = h;
+      clearHeights[y * size + x] = 0.62 + (grain - 0.5) * 0.14;
+
+      const rVal = Math.round((0.18 + (1 - patina) * 0.34) * 255);
+      const idx = (y * size + x) * 4;
+      rData[idx] = rVal;
+      rData[idx + 1] = rVal;
+      rData[idx + 2] = rVal;
+      rData[idx + 3] = 255;
+    }
+  }
+  rCtx.putImageData(rImg, 0, 0);
+
+  // Carve deterministic battle micro-scratches with wrapped coordinates
+  for (let s = 0; s < scratchCount; s++) {
+    let px = rng.range(0, size);
+    let py = rng.range(0, size);
+    const len = rng.range(14, 56);
+    const ang = rng.range(-Math.PI, Math.PI);
+    const depth = rng.range(0.14, 0.36);
+    const steps = Math.max(8, Math.ceil(len));
+    const dx = Math.cos(ang) * (len / steps);
+    const dy = Math.sin(ang) * (len / steps);
+
+    rCtx.strokeStyle = `rgba(218,218,218,${rng.range(0.18, 0.44).toFixed(2)})`;
+    rCtx.lineWidth = rng.range(0.7, 1.5);
+    rCtx.beginPath();
+    rCtx.moveTo(px, py);
+
+    for (let step = 0; step <= steps; step++) {
+      const taper = Math.sin((step / steps) * Math.PI);
+      const ix = ((Math.round(px) % size) + size) % size;
+      const iy = ((Math.round(py) % size) + size) % size;
+      const idx = iy * size + ix;
+      heights[idx] = Math.max(0.05, heights[idx] - depth * taper);
+      clearHeights[idx] = Math.max(0.05, clearHeights[idx] - depth * 1.15 * taper);
+
+      px += dx + rng.range(-0.18, 0.18);
+      py += dy + rng.range(-0.18, 0.18);
+      rCtx.lineTo(px, py);
+    }
+    rCtx.stroke();
+  }
+
+  // Micro-pitting dents along forged edges
+  for (let p = 0; p < 55; p++) {
+    const cx = Math.floor(rng.range(0, size));
+    const cy = Math.floor(rng.range(0, size));
+    const radius = rng.range(1.5, 3.2);
+    const rInt = Math.ceil(radius);
+    for (let oy = -rInt; oy <= rInt; oy++) {
+      for (let ox = -rInt; ox <= rInt; ox++) {
+        const d = Math.hypot(ox, oy);
+        if (d > radius) continue;
+        const ix = (((cx + ox) % size) + size) % size;
+        const iy = (((cy + oy) % size) + size) % size;
+        const falloff = 1 - d / radius;
+        heights[iy * size + ix] = Math.max(0.06, heights[iy * size + ix] - 0.18 * falloff);
+      }
+    }
+  }
+
+  const strength = options.strength ?? 2.35;
+  const normalMap = heightfieldToNormalTexture(heights, size, strength, options.maxAnisotropy, repeat);
+  const clearcoatNormalMap = heightfieldToNormalTexture(
+    clearHeights,
+    size,
+    strength * 1.15,
+    options.maxAnisotropy,
+    repeat
+  );
+
+  const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+  roughnessMap.wrapS = THREE.RepeatWrapping;
+  roughnessMap.wrapT = THREE.RepeatWrapping;
+  roughnessMap.repeat.set(repeat, repeat);
+  roughnessMap.anisotropy = options.maxAnisotropy;
+
+  return { normalMap, roughnessMap, clearcoatNormalMap };
+}
+
+/**
+ * Generates pebble-grain embossed leather normal & roughness maps for bindings,
+ * scabbards, straps, and grimoire covers.
+ */
+export function createEmbossedLeatherTextures(
+  maxAnisotropy: number,
+  seed: number
+): { normalMap: THREE.CanvasTexture; roughnessMap: THREE.CanvasTexture } {
+  const size = 256;
+  const rng = createRng(seed + 1409);
+  const perlin = new Perlin2D(seed + 1410);
+  const heights = new Float32Array(size * size);
+
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = size;
+  roughCanvas.height = size;
+  const rCtx = roughCanvas.getContext('2d')!;
+  rCtx.fillStyle = '#a8a8a8';
+  rCtx.fillRect(0, 0, size, size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const cell = Math.abs(Math.sin(u * Math.PI * 18) * Math.cos(v * Math.PI * 18));
+      const grain = perlin.fbmTiled(u, v, 10, 4);
+      heights[y * size + x] = 0.45 + cell * 0.25 + (grain - 0.5) * 0.28;
+    }
+  }
+
+  // Subtle crease wear lines
+  rCtx.strokeStyle = 'rgba(130,130,130,0.45)';
+  rCtx.lineWidth = 1.6;
+  for (let c = 0; c < 22; c++) {
+    const x0 = rng.range(0, size);
+    const y0 = rng.range(0, size);
+    rCtx.beginPath();
+    rCtx.moveTo(x0, y0);
+    rCtx.lineTo(x0 + rng.range(-38, 38), y0 + rng.range(-38, 38));
+    rCtx.stroke();
+  }
+
+  const normalMap = heightfieldToNormalTexture(heights, size, 2.5, maxAnisotropy, 3);
+  const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+  roughnessMap.wrapS = THREE.RepeatWrapping;
+  roughnessMap.wrapT = THREE.RepeatWrapping;
+  roughnessMap.repeat.set(3, 3);
+  roughnessMap.anisotropy = maxAnisotropy;
+
+  return { normalMap, roughnessMap };
+}
+

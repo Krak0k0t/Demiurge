@@ -53,17 +53,45 @@ import { getTranslations, isRtlLanguage, type LanguageCode } from './i18n/transl
 import type { MagicSchool } from './view/assets/creatureTotems';
 import {
   mountDuelScene,
+  type ArchonPowerHoverKind,
   type CameraPreset,
   type DuelSceneBridge,
   type HoverTargetInfo,
   type ProjectedBadge,
+  type ProjectedLaneRune,
+  type WorldPromptInfo,
 } from './view/duelScene';
+import { useDeviceType } from './hooks/useDeviceType';
+import {
+  applyCrossroadsChoice,
+  getCrossroadsOptions,
+  getDailyTrialConfig,
+  loadCodexSave,
+  pickRivalCombatQuipKey,
+  recordCardsDiscovered,
+  recordContractCompleted,
+  recordForgeCompleted,
+  recordOrderVictory,
+  recordRelicsDiscovered,
+  recordStageCleared,
+  recordTrialRun,
+  saveCodexSave,
+  STAGE_SIGNATURE_CARDS,
+  type CodexSaveData,
+  type CrossroadsEventDef,
+  type CrossroadsEventId,
+  type DailyTrialConfig,
+  type TrialModifierId,
+} from './game/cathedralMeta';
 import { TitleScreen } from './ui/TitleScreen';
 import { DuelHud, type CardAnchorPoint } from './ui/DuelHud';
+import { HudSettingsProvider, useHudSettings } from './ui/HudSettingsContext';
 import { BriefingModal, DraftModal, GameOverModal, PauseModal, type SanctuaryAction } from './ui/Modals';
 import { HelpModal } from './ui/HelpModal';
+import { CodexModal } from './ui/CodexModal';
+import { CrossroadsModal } from './ui/CrossroadsModal';
 
-type ShellMode = 'title' | 'briefing' | 'playing' | 'paused' | 'draft' | 'gameover';
+type ShellMode = 'title' | 'briefing' | 'playing' | 'paused' | 'draft' | 'crossroads' | 'gameover';
 
 const INITIAL_LOOKDEV_STATE: LookDevUiState = {
   preset: 'combat',
@@ -78,7 +106,7 @@ const INITIAL_LOOKDEV_STATE: LookDevUiState = {
 
 function mapBodyDatasetState(mode: ShellMode): 'title' | 'playing' | 'paused' | 'gameover' {
   if (mode === 'title') return 'title';
-  if (mode === 'paused' || mode === 'briefing' || mode === 'draft') return 'paused';
+  if (mode === 'paused' || mode === 'briefing' || mode === 'draft' || mode === 'crossroads') return 'paused';
   if (mode === 'gameover') return 'gameover';
   return 'playing';
 }
@@ -123,6 +151,7 @@ interface SavedCampaignRun {
   archonXp: number;
   maxHpBonus: number;
   startingResonanceBonus: number;
+  trialModifier?: TrialModifierId | null;
 }
 
 function loadSavedRun(): SavedCampaignRun | null {
@@ -193,11 +222,12 @@ function isTargetedSpellCard(cardId: string, state: DuelState): boolean {
   return false;
 }
 
-export default function App() {
+function AppContent() {
   const launch = readLaunchParams(window.location.search);
   const mode = launch.scene;
   const isHelloMode = mode === 'hello';
   const isLookDevMode = mode === 'lookdev';
+  const { bindEngineBridge, selectPattern } = useHudSettings();
 
   const mountRef = useRef<HTMLDivElement | null>(null);
   const helloBridgeRef = useRef<HelloSceneBridge | null>(null);
@@ -222,10 +252,20 @@ export default function App() {
   const [shellMode, setShellMode] = useState<ShellMode>(launch.autostart ? 'playing' : 'title');
   const [duelState, setDuelState] = useState<DuelState | null>(() =>
     launch.autostart
-      ? createDuelState({ stageIndex: 0, difficulty: 'archmage', playerSchool: 'synth', seed: launch.seed })
+      ? createDuelState({
+          stageIndex: 0,
+          difficulty: 'archmage',
+          playerSchool: 'synth',
+          enableLaneRunes: true,
+          enableQuests: true,
+          seed: launch.seed,
+        })
       : null
   );
+  const { isMobile, hasTouch } = useDeviceType();
   const [badges, setBadges] = useState<ProjectedBadge[]>([]);
+  const [laneRunes, setLaneRunes] = useState<ProjectedLaneRune[]>([]);
+  const [worldPrompts, setWorldPrompts] = useState<WorldPromptInfo[]>([]);
   const [preset, setPreset] = useState<CameraPreset>('combat');
   const [selectedHandIndex, setSelectedHandIndex] = useState<number | null>(null);
   const [swapMode, setSwapMode] = useState<boolean>(false);
@@ -254,6 +294,21 @@ export default function App() {
   const [hoverInspector, setHoverInspectorState] = useState<boolean>(() => getHoverInspector());
   const [hoverTarget, setHoverTarget] = useState<HoverTargetInfo | null>(null);
   const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [showCodex, setShowCodex] = useState<boolean>(false);
+  const [dailyTrial] = useState<DailyTrialConfig>(() => getDailyTrialConfig());
+  const [activeTrial, setActiveTrial] = useState<DailyTrialConfig | null>(null);
+  const [codexSave, setCodexSave] = useState<CodexSaveData>(() => loadCodexSave());
+  const [rivalCombatQuip, setRivalCombatQuip] = useState<string | null>(null);
+  const [crossroadsOptions, setCrossroadsOptions] = useState<CrossroadsEventDef[]>([]);
+  const [pendingCrossroadsPayload, setPendingCrossroadsPayload] = useState<{
+    nextStage: number;
+    deck: string[];
+    relics: RelicId[];
+    forgedCards: Record<string, number>;
+    archonXp: number;
+    maxHpBonus: number;
+    startingResonanceBonus: number;
+  } | null>(null);
 
   const t = getTranslations(lang);
   const rtl = isRtlLanguage(lang);
@@ -268,8 +323,13 @@ export default function App() {
   const resolvingTurnRef = useRef(resolvingTurn);
   const fastCombatRef = useRef(fastCombat);
   const showHelpRef = useRef(showHelp);
+  const showCodexRef = useRef(showCodex);
+  const activeTrialRef = useRef(activeTrial);
   const langRef = useRef(lang);
+  const isMobileRef = useRef(isMobile);
+  const hasTouchRef = useRef(hasTouch);
   const pendingAfterQueueRef = useRef<(() => void) | null>(null);
+  const quipTimerRef = useRef<number | null>(null);
   const timersRef = useRef<number[]>([]);
   shellModeRef.current = shellMode;
   duelStateRef.current = duelState;
@@ -280,11 +340,39 @@ export default function App() {
   resolvingTurnRef.current = resolvingTurn;
   fastCombatRef.current = fastCombat;
   showHelpRef.current = showHelp;
+  showCodexRef.current = showCodex;
+  activeTrialRef.current = activeTrial;
   langRef.current = lang;
+  isMobileRef.current = isMobile;
+  hasTouchRef.current = hasTouch;
+
+  const updateCodex = useCallback((updater: (prev: CodexSaveData) => CodexSaveData) => {
+    setCodexSave((prev) => {
+      const next = updater(prev);
+      if (next !== prev) saveCodexSave(next);
+      return next;
+    });
+  }, []);
+
+  const triggerRivalQuip = useCallback((text: string | undefined) => {
+    if (!text) return;
+    if (quipTimerRef.current !== null) {
+      window.clearTimeout(quipTimerRef.current);
+    }
+    setRivalCombatQuip(text);
+    quipTimerRef.current = window.setTimeout(() => {
+      setRivalCombatQuip(null);
+      quipTimerRef.current = null;
+    }, 3800);
+  }, []);
 
   const clearPendingTimers = useCallback(() => {
     timersRef.current.forEach((id) => window.clearTimeout(id));
     timersRef.current = [];
+    if (quipTimerRef.current !== null) {
+      window.clearTimeout(quipTimerRef.current);
+      quipTimerRef.current = null;
+    }
   }, []);
 
   const scheduleTimer = useCallback((fn: () => void, ms: number) => {
@@ -302,12 +390,42 @@ export default function App() {
     (next: DuelState, forcedMode?: ShellMode): number => {
       const prevHp = duelStateRef.current?.playerHp ?? next.playerHp;
       const events = next.pendingEvents;
-      if (events.length > 0 && !duelBridgeRef.current) {
-        playCombatAudio(events, next);
+      if (events.length > 0) {
+        if (!duelBridgeRef.current) {
+          playCombatAudio(events, next);
+        }
+        const sigSet = STAGE_SIGNATURE_CARDS[next.stageIndex] ?? [];
+        const hasHeavyHit = events.some(
+          (ev) =>
+            (ev.type === 'hit_demiurge' && ev.side === 'enemy' && (ev.amount ?? 0) >= 4) ||
+            ev.type === 'ultimatum' ||
+            ev.type === 'resonance'
+        );
+        const hasEnemySig = events.some(
+          (ev) => ev.type === 'summon' && ev.side === 'enemy' && ev.cardId && sigSet.includes(ev.cardId)
+        );
+        const hasPlayerOverload = events.some((ev) => ev.type === 'overload' && ev.side === 'player');
+        const quipTrigger = hasHeavyHit
+          ? 'heavy_hit'
+          : hasEnemySig
+            ? 'summon_sig'
+            : hasPlayerOverload
+              ? 'overload_react'
+              : null;
+        if (quipTrigger) {
+          const qKey = pickRivalCombatQuipKey(next.stageIndex, quipTrigger);
+          triggerRivalQuip(getTranslations(langRef.current).bossCombatQuips[qKey]);
+        }
       }
       if (next.playerHp > 0 && next.playerHp <= 7 && next.playerHp < prevHp) {
         etherAudio.playHeartbeat();
       }
+
+      updateCodex((prev) => {
+        let updated = recordCardsDiscovered(prev, next.playerDeck);
+        updated = recordRelicsDiscovered(updated, next.relics);
+        return updated;
+      });
 
       let nextMode: ShellMode = forcedMode ?? 'playing';
       if (!forcedMode) {
@@ -318,6 +436,25 @@ export default function App() {
           const stageCleared = next.stageIndex + 1;
           saveBestStage(stageCleared);
           setBestStage((prev) => Math.max(prev, stageCleared));
+
+          updateCodex((prev) => {
+            let updated = recordStageCleared(prev);
+            if (next.activeQuest?.completed) {
+              updated = recordContractCompleted(updated);
+            }
+            if (next.stageIndex >= 6) {
+              updated = recordOrderVictory(updated, next.playerSchool);
+              if (activeTrialRef.current) {
+                updated = recordTrialRun(updated, {
+                  dateKey: activeTrialRef.current.dateKey,
+                  stageReached: 7,
+                  score: next.damageDealtTotal,
+                  completed: true,
+                });
+              }
+            }
+            return updated;
+          });
 
           if (next.stageIndex < 6) {
             const defeatedSchool = getOpponentForStage(next.stageIndex).school;
@@ -342,6 +479,17 @@ export default function App() {
           const stageReached = next.stageIndex + 1;
           saveBestStage(stageReached);
           setBestStage((prev) => Math.max(prev, stageReached));
+          if (activeTrialRef.current) {
+            const trialSnap = activeTrialRef.current;
+            updateCodex((prev) =>
+              recordTrialRun(prev, {
+                dateKey: trialSnap.dateKey,
+                stageReached,
+                score: next.damageDealtTotal,
+                completed: false,
+              })
+            );
+          }
           saveCampaignRun(null);
           setSavedRun(null);
           nextMode = 'gameover';
@@ -353,6 +501,7 @@ export default function App() {
       const immediateMode: ShellMode = isOutcomeTransition ? 'playing' : nextMode;
       const durationSec =
         duelBridgeRef.current?.syncDuelState(next, mapBodyDatasetState(immediateMode)) ?? 0;
+      duelBridgeRef.current?.setPowerHoverPreview(null, null);
 
       const cleanNext = { ...next, pendingEvents: [] };
       setShellMode(immediateMode);
@@ -383,7 +532,7 @@ export default function App() {
 
       return durationSec;
     },
-    [scheduleTimer]
+    [scheduleTimer, triggerRivalQuip, updateCodex]
   );
 
   const commitRef = useRef(commitDuelState);
@@ -414,6 +563,8 @@ export default function App() {
 
     const bridge = mountDuelScene(container, {
       onBadgesUpdate: (nextBadges) => setBadges(nextBadges),
+      onLaneRunesUpdate: (nextRunes) => setLaneRunes(nextRunes),
+      onWorldPromptUpdate: (nextPrompts) => setWorldPrompts(nextPrompts),
       onHoverTargetChange: (target) => setHoverTarget(target),
       onQueueBusyChange: (busy) => {
         resolvingTurnRef.current = busy;
@@ -496,39 +647,49 @@ export default function App() {
       },
     });
     duelBridgeRef.current = bridge;
+    bindEngineBridge({
+      setPattern: (pattern) => bridge.setPattern(pattern),
+      triggerPattern: (pattern) => bridge.triggerPattern(pattern),
+    });
+    bridge.syncExternalState({
+      isMobile: isMobileRef.current,
+      inputMode: hasTouchRef.current ? 'touch' : 'keyboard',
+    });
 
     if (duelStateRef.current) {
       bridge.syncDuelState(duelStateRef.current, mapBodyDatasetState(shellModeRef.current));
+      if (shellModeRef.current === 'playing') {
+        bridge.triggerBattleStartVfx(duelStateRef.current.playerSchool);
+      }
     } else {
       bridge.syncDuelState(null, 'title');
     }
 
     return () => {
+      bindEngineBridge(null);
       bridge.dispose();
       duelBridgeRef.current = null;
     };
-  }, [isHelloMode, isLookDevMode]);
+  }, [isHelloMode, isLookDevMode, bindEngineBridge]);
 
-  // Sync document.body.dataset.state & RTL dir & adaptive music
+  // Sync document.body.dataset.state, RTL dir, and optional Dynamic music mode
   useEffect(() => {
     if (isHelloMode || isLookDevMode) return;
     document.body.dataset.state = mapBodyDatasetState(shellMode);
     document.documentElement.dir = rtl ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
+    const stIdx = duelState?.stageIndex ?? 0;
+    const isBoss = duelState ? getOpponentForStage(stIdx).isBoss : false;
+    etherAudio.syncDynamicContext(stIdx, isBoss, shellMode);
+    duelBridgeRef.current?.setBriefingCamera(shellMode === 'briefing');
+  }, [shellMode, rtl, lang, duelState?.stageIndex, isHelloMode, isLookDevMode]);
 
-    if (shellMode === 'title') {
-      etherAudio.setTrack('title');
-    } else if (shellMode === 'playing' && duelState) {
-      const opp = getOpponentForStage(duelState.stageIndex);
-      if (duelState.overloadUsedThisTurn || duelState.ultimatumActive) {
-        etherAudio.setTrack('overload');
-      } else if (opp.isBoss) {
-        etherAudio.setTrack('boss');
-      } else {
-        etherAudio.setTrack('calm');
-      }
-    }
-  }, [shellMode, duelState, rtl, lang, isHelloMode, isLookDevMode]);
+  useEffect(() => {
+    duelBridgeRef.current?.syncExternalState({
+      isMobile,
+      inputMode: hasTouch ? 'touch' : 'keyboard',
+    });
+  }, [isMobile, hasTouch]);
 
   useEffect(() => {
     duelBridgeRef.current?.setCardSelected(selectedHandIndex !== null);
@@ -586,12 +747,15 @@ export default function App() {
         startingResonanceBonus?: number;
         difficulty?: Difficulty;
         playerSchool?: MagicSchool;
+        trialModifier?: TrialModifierId | null;
+        seedOverride?: number;
       }
     ) => {
       clearPendingTimers();
       pendingAfterQueueRef.current = null;
       setResolvingTurn(false);
       setRivalCallout(null);
+      setRivalCombatQuip(null);
       const effDiff = overrides?.difficulty ?? difficulty;
       const effSchool = overrides?.playerSchool ?? playerSchool;
       const effRelics = overrides?.relics ?? campaignRelics;
@@ -599,6 +763,11 @@ export default function App() {
       const effXp = overrides?.archonXp ?? archonXp;
       const effHpBonus = overrides?.maxHpBonus ?? maxHpBonus;
       const effResBonus = overrides?.startingResonanceBonus ?? startingResonanceBonus;
+      const effTrial =
+        overrides?.trialModifier !== undefined
+          ? overrides.trialModifier
+          : (activeTrialRef.current?.modifier ?? null);
+      const effSeed = overrides?.seedOverride ?? activeTrialRef.current?.seed ?? launch.seed;
 
       const fresh = createDuelState({
         stageIndex,
@@ -610,7 +779,10 @@ export default function App() {
         archonRank: getArchonRank(effXp),
         maxHpBonus: effHpBonus,
         startingResonanceBonus: effResBonus,
-        seed: launch.seed + stageIndex * 101,
+        trialModifier: effTrial,
+        enableLaneRunes: true,
+        enableQuests: true,
+        seed: effSeed + stageIndex * 101,
       });
 
       const runSnapshot: SavedCampaignRun = {
@@ -623,6 +795,7 @@ export default function App() {
         archonXp: effXp,
         maxHpBonus: effHpBonus,
         startingResonanceBonus: effResBonus,
+        trialModifier: effTrial,
       };
       saveCampaignRun(runSnapshot);
       setSavedRun(runSnapshot);
@@ -630,8 +803,10 @@ export default function App() {
       const opp = getOpponentForStage(stageIndex);
       const nextMode: ShellMode = showBriefing && opp.hasCutscene ? 'briefing' : 'playing';
       etherAudio.playUiSelect();
-      etherAudio.startMusic(opp.isBoss ? 'boss' : 'calm');
       commitDuelState(fresh, nextMode);
+      if (nextMode === 'playing') {
+        duelBridgeRef.current?.triggerBattleStartVfx(fresh.playerSchool);
+      }
     },
     [
       clearPendingTimers,
@@ -648,6 +823,7 @@ export default function App() {
   );
 
   const handleStartCampaign = useCallback(() => {
+    setActiveTrial(null);
     setCampaignRelics([]);
     setForgedCards({});
     setArchonXp(0);
@@ -660,8 +836,37 @@ export default function App() {
       archonXp: 0,
       maxHpBonus: 0,
       startingResonanceBonus: 0,
+      trialModifier: null,
+      seedOverride: launch.seed,
     });
-  }, [startStage]);
+  }, [launch.seed, startStage]);
+
+  const handleStartDailyTrial = useCallback(() => {
+    setActiveTrial(dailyTrial);
+    setDifficulty('archmage');
+    setPlayerSchool(dailyTrial.school);
+    setCampaignRelics([]);
+    setForgedCards({});
+    setArchonXp(0);
+    setLastXpGained(0);
+    setMaxHpBonus(0);
+    setStartingResonanceBonus(0);
+    startStage(0, undefined, true, {
+      difficulty: 'archmage',
+      playerSchool: dailyTrial.school,
+      relics: [],
+      forgedCards: {},
+      archonXp: 0,
+      maxHpBonus: 0,
+      startingResonanceBonus: 0,
+      trialModifier: dailyTrial.modifier,
+      seedOverride: dailyTrial.seed,
+    });
+  }, [dailyTrial, startStage]);
+
+  const handleHoverPower = useCallback((kind: ArchonPowerHoverKind | null) => {
+    duelBridgeRef.current?.setPowerHoverPreview(kind, duelStateRef.current);
+  }, []);
 
   const handlePlayCard = useCallback(
     (handIndex: number, anchor?: CardAnchorPoint) => {
@@ -903,6 +1108,30 @@ export default function App() {
         return;
       }
 
+      if (e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        handleToggleAudio();
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        etherAudio.prevTrack();
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        etherAudio.nextTrack();
+        return;
+      }
+
+      if (showCodexRef.current) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowCodex(false);
+        }
+        return;
+      }
+
       if (showHelpRef.current) {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -922,6 +1151,7 @@ export default function App() {
         etherAudio.playUiSelect();
         setShellMode('playing');
         duelBridgeRef.current?.syncDuelState(duelStateRef.current, 'playing');
+        duelBridgeRef.current?.triggerBattleStartVfx(duelStateRef.current?.playerSchool);
         return;
       }
       if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
@@ -940,12 +1170,17 @@ export default function App() {
         if (e.key === ' ') {
           e.preventDefault();
           handleOverload();
-        } else if (e.key === '1') {
-          handleSelectPreset('combat');
-        } else if (e.key === '2') {
-          handleSelectPreset('closeup');
-        } else if (e.key === '3') {
-          handleSelectPreset('wide');
+        } else if (e.key.toLowerCase() === 'e' && !resolvingTurnRef.current) {
+          e.preventDefault();
+          handleEndTurn();
+        } else if (e.key.toLowerCase() === 'c') {
+          e.preventDefault();
+          setPreset((prev) => {
+            const next: CameraPreset =
+              prev === 'combat' ? 'closeup' : prev === 'closeup' ? 'wide' : 'combat';
+            duelBridgeRef.current?.setPreset(next);
+            return next;
+          });
         }
       }
     };
@@ -958,7 +1193,14 @@ export default function App() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('blur', onBlur);
     };
-  }, [isHelloMode, isLookDevMode, handleStartCampaign, handleOverload, handleSelectPreset]);
+  }, [
+    isHelloMode,
+    isLookDevMode,
+    handleStartCampaign,
+    handleOverload,
+    handleEndTurn,
+    handleToggleAudio,
+  ]);
 
   return (
     <div
@@ -992,6 +1234,7 @@ export default function App() {
               hoverInspector={hoverInspector}
               muted={muted}
               isFullscreen={isFullscreen}
+              isMobile={isMobile}
               canContinue={Boolean(
                 (duelState && duelState.phase === 'player_main') || savedRun
               )}
@@ -1006,6 +1249,8 @@ export default function App() {
                   : (savedRun?.archonXp ?? archonXp)
               )}
               bestStage={bestStage}
+              dailyTrial={dailyTrial}
+              codex={codexSave}
               onSelectLang={setLang}
               onSelectDifficulty={setDifficulty}
               onSelectSchool={setPlayerSchool}
@@ -1013,6 +1258,7 @@ export default function App() {
               onToggleFastCombat={handleToggleFastCombat}
               onToggleHoverInspector={handleToggleHoverInspector}
               onStart={handleStartCampaign}
+              onStartDailyTrial={handleStartDailyTrial}
               onContinue={() => {
                 etherAudio.playUiSelect();
                 if (duelState && duelState.phase === 'player_main') {
@@ -1026,22 +1272,29 @@ export default function App() {
                   setArchonXp(savedRun.archonXp);
                   setMaxHpBonus(savedRun.maxHpBonus);
                   setStartingResonanceBonus(savedRun.startingResonanceBonus);
+                  setActiveTrial(
+                    savedRun.trialModifier ? { ...dailyTrial, modifier: savedRun.trialModifier } : null
+                  );
                   startStage(savedRun.stageIndex, savedRun.deck, true, savedRun);
                 }
               }}
+              onOpenCodex={() => setShowCodex(true)}
               onOpenHelp={() => setShowHelp(true)}
               onToggleAudio={handleToggleAudio}
               onToggleFullscreen={handleToggleFullscreen}
             />
           )}
 
-          {shellMode !== 'title' && duelState && (
+          {shellMode !== 'title' && shellMode !== 'briefing' && duelState && (
             <DuelHud
               t={t}
               state={duelState}
               badges={badges}
+              laneRunes={laneRunes}
+              worldPrompts={worldPrompts}
               hoverTarget={shellMode === 'playing' && hoverInspector ? hoverTarget : null}
               preset={preset}
+              isMobile={isMobile}
               selectedHandIndex={selectedHandIndex}
               swapMode={swapMode}
               swapSourceLane={swapSourceLane}
@@ -1054,11 +1307,23 @@ export default function App() {
               )}
               resolvingTurn={resolvingTurn}
               rivalCallout={rivalCallout}
+              rivalCombatQuip={rivalCombatQuip}
               graphicsLevel={GRAPHICS_LEVEL[graphics]}
+              graphics={graphics}
+              fastCombat={fastCombat}
+              hoverInspector={hoverInspector}
               muted={muted}
               isFullscreen={isFullscreen}
               onSelectPreset={handleSelectPreset}
+              onSelectGraphics={handleSelectGraphics}
+              onToggleFastCombat={handleToggleFastCombat}
+              onToggleHoverInspector={handleToggleHoverInspector}
+              onTriggerPattern={(pattern) => {
+                selectPattern(pattern);
+                duelBridgeRef.current?.triggerPattern(pattern);
+              }}
               onSelectCard={handlePlayCard}
+              onHoverPower={handleHoverPower}
               onTargetCreature={handleTargetCreature}
               onHoverCard={(idx, anchor) => {
                 if (idx !== null) etherAudio.playCardHover();
@@ -1124,10 +1389,13 @@ export default function App() {
               opponentSchool={getOpponentForStage(duelState.stageIndex).school}
               playerSchool={duelState.playerSchool}
               archonRank={getArchonRank(archonXp)}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
               onContinue={() => {
                 etherAudio.playUiSelect();
                 setShellMode('playing');
                 duelBridgeRef.current?.syncDuelState(duelState, 'playing');
+                duelBridgeRef.current?.triggerBattleStartVfx(duelState.playerSchool);
               }}
             />
           )}
@@ -1147,6 +1415,7 @@ export default function App() {
               onToggleFastCombat={handleToggleFastCombat}
               onToggleHoverInspector={handleToggleHoverInspector}
               onToggleFullscreen={handleToggleFullscreen}
+              onOpenCodex={() => setShowCodex(true)}
               onOpenHelp={() => setShowHelp(true)}
               onResume={() => {
                 setShellMode('playing');
@@ -1174,15 +1443,22 @@ export default function App() {
               archonXp={archonXp}
               xpGained={lastXpGained}
               forgedCards={forgedCards}
+              defeatedOpponentId={getOpponentForStage(duelState.stageIndex).id}
               defeatedSchool={getOpponentForStage(duelState.stageIndex).school}
               playerSchool={duelState.playerSchool}
+              quest={duelState.activeQuest}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
               onConfirmDraft={(newCardId: string, sanctuary: SanctuaryAction, pickedRelic) => {
                 const nextRelics = pickedRelic ? [...campaignRelics, pickedRelic] : campaignRelics;
                 setCampaignRelics(nextRelics);
 
                 let upgradedDeck = duelState.playerDeck;
                 let nextForged = forgedCards;
-                let nextHpBonus = maxHpBonus;
+                let nextHpBonus = maxHpBonus + (duelState.activeQuest?.completed ? 1 : 0);
+                if (duelState.activeQuest?.completed) {
+                  setMaxHpBonus(nextHpBonus);
+                }
                 let nextResBonus = startingResonanceBonus;
 
                 if (sanctuary.kind === 'replace') {
@@ -1218,12 +1494,80 @@ export default function App() {
                   upgradedDeck = applyDraftReplacement(purged, newCardId, null);
                 }
 
-                startStage(duelState.stageIndex + 1, upgradedDeck, true, {
+                updateCodex((prev) => {
+                  let updated = recordCardsDiscovered(prev, [newCardId, ...upgradedDeck]);
+                  updated = recordRelicsDiscovered(updated, nextRelics);
+                  if (sanctuary.kind === 'forge') {
+                    updated = recordForgeCompleted(updated);
+                  }
+                  return updated;
+                });
+
+                const nextStage = duelState.stageIndex + 1;
+                if (nextStage === 2 || nextStage === 4) {
+                  setCrossroadsOptions(getCrossroadsOptions(nextStage, duelState.seed));
+                  setPendingCrossroadsPayload({
+                    nextStage,
+                    deck: upgradedDeck,
+                    relics: nextRelics,
+                    forgedCards: nextForged,
+                    archonXp,
+                    maxHpBonus: nextHpBonus,
+                    startingResonanceBonus: nextResBonus,
+                  });
+                  setShellMode('crossroads');
+                  duelBridgeRef.current?.syncDuelState(duelState, 'paused');
+                  return;
+                }
+
+                startStage(nextStage, upgradedDeck, true, {
                   relics: nextRelics,
                   forgedCards: nextForged,
                   archonXp,
                   maxHpBonus: nextHpBonus,
                   startingResonanceBonus: nextResBonus,
+                });
+              }}
+            />
+          )}
+
+          {shellMode === 'crossroads' && pendingCrossroadsPayload && (
+            <CrossroadsModal
+              t={t}
+              stageIndex={pendingCrossroadsPayload.nextStage}
+              options={crossroadsOptions}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
+              onChoose={(eventId: CrossroadsEventId) => {
+                etherAudio.playAscend();
+                const res = applyCrossroadsChoice({
+                  eventId,
+                  deck: pendingCrossroadsPayload.deck,
+                  forgedCards: pendingCrossroadsPayload.forgedCards,
+                  relics: pendingCrossroadsPayload.relics,
+                  maxHpBonus: pendingCrossroadsPayload.maxHpBonus,
+                  startingResonanceBonus: pendingCrossroadsPayload.startingResonanceBonus,
+                  seed: (duelState?.seed ?? launch.seed) + 55,
+                });
+                setCampaignRelics(res.relics);
+                setForgedCards(res.forgedCards);
+                setMaxHpBonus(res.maxHpBonus);
+                setStartingResonanceBonus(res.startingResonanceBonus);
+                updateCodex((prev) => {
+                  let updated = recordRelicsDiscovered(prev, res.relics);
+                  if (eventId === 'astral_anvil' && res.outcomeCardId) {
+                    updated = recordForgeCompleted(updated);
+                  }
+                  return updated;
+                });
+                const nextStage = pendingCrossroadsPayload.nextStage;
+                setPendingCrossroadsPayload(null);
+                startStage(nextStage, res.deck, true, {
+                  relics: res.relics,
+                  forgedCards: res.forgedCards,
+                  archonXp: pendingCrossroadsPayload.archonXp,
+                  maxHpBonus: res.maxHpBonus,
+                  startingResonanceBonus: res.startingResonanceBonus,
                 });
               }}
             />
@@ -1237,12 +1581,15 @@ export default function App() {
               isCampaignComplete={duelState.phase === 'victory' && duelState.stageIndex >= 6}
               xpGained={lastXpGained}
               archonXp={archonXp}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
               onNextDuel={() => startStage(duelState.stageIndex + 1, duelState.playerDeck, true)}
-              onPlayAgain={handleStartCampaign}
+              onPlayAgain={activeTrial ? handleStartDailyTrial : handleStartCampaign}
               onExitToMenu={() => {
                 pendingAfterQueueRef.current = null;
                 setResolvingTurn(false);
                 setRivalCallout(null);
+                setRivalCombatQuip(null);
                 setDuelState(null);
                 setShellMode('title');
                 duelBridgeRef.current?.syncDuelState(null, 'title');
@@ -1250,9 +1597,34 @@ export default function App() {
             />
           )}
 
-          {showHelp && <HelpModal t={t} onClose={() => setShowHelp(false)} />}
+          {showHelp && (
+            <HelpModal
+              t={t}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
+              onClose={() => setShowHelp(false)}
+            />
+          )}
+          {showCodex && (
+            <CodexModal
+              t={t}
+              codex={codexSave}
+              dailyTrial={dailyTrial}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
+              onClose={() => setShowCodex(false)}
+            />
+          )}
         </>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <HudSettingsProvider>
+      <AppContent />
+    </HudSettingsProvider>
   );
 }

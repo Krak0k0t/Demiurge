@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getGraphicsDetailTier, type DetailTier } from '../../core/graphicsSettings';
 import { TAROT_PALETTE, type TarotMaterialLibrary } from '../materials/tarotMaterials';
+import { buildPlayerArchonSculpt } from './heroArchonBuilder';
 
 export interface DemiurgeModelHandle {
   group: THREE.Group;
@@ -16,9 +17,17 @@ export interface DemiurgeModelHandle {
   dispose: () => void;
 }
 
+function ensureTangents(geo: THREE.BufferGeometry): void {
+  if (geo.index && geo.attributes.uv && geo.attributes.normal) {
+    geo.computeTangents();
+  }
+}
+
 function makeLatheProfile(coords: Array<[number, number]>, segments = 16): THREE.LatheGeometry {
   const pts = coords.map(([r, y]) => new THREE.Vector2(r, y));
-  return new THREE.LatheGeometry(pts, segments);
+  const geo = new THREE.LatheGeometry(pts, segments);
+  ensureTangents(geo);
+  return geo;
 }
 
 export function buildDemiurgeSculpt(
@@ -28,11 +37,15 @@ export function buildDemiurgeSculpt(
   stageIndex = 0,
   detailLevel: DetailTier = getGraphicsDetailTier()
 ): DemiurgeModelHandle {
+  if (role === 'player') {
+    return buildPlayerArchonSculpt(mats, contactTex, detailLevel);
+  }
+
   const group = new THREE.Group();
   const geometries: THREE.BufferGeometry[] = [];
   const customMats: THREE.Material[] = [];
 
-  const isPlayer = role === 'player';
+  const isPlayer = false;
   const stage = Math.max(0, Math.min(6, stageIndex));
 
   // Stage-tailored materials for the 7 unique tournament opponents
@@ -225,6 +238,8 @@ export function buildDemiurgeSculpt(
   geometries.push(beltGeo);
   const belt = new THREE.Mesh(beltGeo, trimMat);
   belt.scale.set(1.08, 1, 0.88);
+  belt.castShadow = true;
+  belt.receiveShadow = true;
   animRig.add(belt);
 
   // Front embroidered stole / tabard (beveled ExtrudeGeometry)
@@ -246,6 +261,8 @@ export function buildDemiurgeSculpt(
   const tabard = new THREE.Mesh(tabardGeo, mats.agedLeatherMat);
   tabard.position.set(0, 0, 0.28);
   tabard.rotation.x = -0.22;
+  tabard.castShadow = true;
+  tabard.receiveShadow = true;
   animRig.add(tabard);
 
   // 3. Upper Torso Armor & Sculpted Cuirass + Draped Cape
@@ -268,6 +285,7 @@ export function buildDemiurgeSculpt(
   const cuirass = new THREE.Mesh(cuirassGeo, armorMat);
   cuirass.scale.set(1.08, 1, 0.84);
   cuirass.castShadow = true;
+  cuirass.receiveShadow = true;
   torsoGroup.add(cuirass);
 
   // Subtle recessed chest jewel bezel (non-glaring)
@@ -348,6 +366,8 @@ export function buildDemiurgeSculpt(
       const st = new THREE.Mesh(sideTassetGeo, armorMat);
       st.position.set(dir * 0.42, 0.84, 0.02);
       st.rotation.z = -dir * 0.2;
+      st.castShadow = true;
+      st.receiveShadow = true;
       animRig.add(st);
     });
   }
@@ -364,6 +384,7 @@ export function buildDemiurgeSculpt(
       plate.position.set(0, 0.36 - i * 0.22, -0.34 - i * 0.028);
       plate.rotation.x = 0.14;
       plate.scale.set(1 + i * 0.12, 1, 1);
+      plate.castShadow = true;
       torsoGroup.add(plate);
       registerShatter(plate, 0, 2.2 - i * 0.3, -2.8);
     }
@@ -441,6 +462,7 @@ export function buildDemiurgeSculpt(
     pSub.position.set(dir * 0.48, 0.48, 0);
     pSub.scale.set(dir * 0.85, 0.85, 1.0);
     pSub.rotation.z = -dir * 0.38;
+    pSub.castShadow = true;
     torsoGroup.add(pSub);
     registerShatter(pSub, dir * 3.1, 2.2, -0.6);
 
@@ -452,16 +474,19 @@ export function buildDemiurgeSculpt(
     upper.position.set(dir * 0.08, -0.14, 0.04);
     upper.rotation.z = dir * 0.24;
     upper.rotation.x = -0.22;
+    upper.castShadow = true;
     armRoot.add(upper);
 
     const forearm = new THREE.Mesh(forearmGeo, armorMat);
     const isWeaponArm = dir === staffSide;
     forearm.position.set(dir * 0.16, -0.24, isWeaponArm ? 0.26 : 0.28);
     forearm.rotation.x = isWeaponArm ? -1.18 : -1.05;
+    forearm.castShadow = true;
     armRoot.add(forearm);
 
     const gauntlet = new THREE.Mesh(gauntletGeo, trimMat);
     gauntlet.position.set(dir * 0.18, isWeaponArm ? -0.17 : -0.16, isWeaponArm ? 0.44 : 0.46);
+    gauntlet.castShadow = true;
     armRoot.add(gauntlet);
 
     if (detailLevel >= 2) {
@@ -562,6 +587,7 @@ export function buildDemiurgeSculpt(
     geometries.push(crestGeo);
     const crest = new THREE.Mesh(crestGeo, trimMat);
     crest.position.set(0, 0.22, 0.02);
+    crest.castShadow = true;
     headGroup.add(crest);
 
     [-1, 1].forEach((dir) => {
@@ -572,6 +598,7 @@ export function buildDemiurgeSculpt(
         new THREE.Vector3(dir * 0.15, 0.58, 0.12),
       ]);
       const hornGeo = new THREE.TubeGeometry(hornCurve, 14, 0.036, 8, false);
+      ensureTangents(hornGeo);
       geometries.push(hornGeo);
       const horn = new THREE.Mesh(hornGeo, mats.boneIvoryMat);
       horn.castShadow = true;
@@ -584,8 +611,10 @@ export function buildDemiurgeSculpt(
   haloGroup.position.set(0, 0.88, -0.22);
   torsoGroup.add(haloGroup);
   const haloGeo = new THREE.TorusGeometry(0.62, 0.024, 8, detailLevel >= 2 ? 44 : 22);
+  ensureTangents(haloGeo);
   geometries.push(haloGeo);
   const haloRing = new THREE.Mesh(haloGeo, trimMat);
+  haloRing.castShadow = true;
   haloGroup.add(haloRing);
   registerShatter(haloGroup, 0, 4.6, -2.1, 3.0, 5.2);
 
@@ -783,10 +812,12 @@ export function buildDemiurgeSculpt(
 
   const crescent = new THREE.Mesh(crescentGeo, trimMat);
   crescent.position.y = 2.54;
+  crescent.castShadow = true;
   staffGroup.add(crescent);
 
   const spearTip = new THREE.Mesh(spearTipGeo, mats.bluedSteelMat);
   spearTip.position.y = 2.86;
+  spearTip.castShadow = true;
   staffGroup.add(spearTip);
 
   const orb = new THREE.Mesh(staffGemGeo, coreMat);
@@ -869,6 +900,8 @@ export function buildDemiurgeSculpt(
     });
     geometries.push(shieldGeo);
     const shield = new THREE.Mesh(shieldGeo, armorMat);
+    shield.castShadow = true;
+    shield.receiveShadow = true;
     const shieldBoss = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), trimMat);
     geometries.push(shieldBoss.geometry);
     shieldBoss.position.z = 0.06;

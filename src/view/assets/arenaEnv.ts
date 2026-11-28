@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { Reflector } from 'three/addons/objects/Reflector.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { type TarotMaterialLibrary } from '../materials/tarotMaterials';
 import { createFoliageAlphaTextures, createPerlinNormalRoughnessPair } from '../materials/proceduralNoise';
@@ -115,16 +114,30 @@ export const STAGE_ATMOSPHERES: StageAtmosphere[] = [
 
 import type { MagicSchool } from './creatureTotems';
 
+export type ArenaLaneRune = 'aegis' | 'surge' | 'fury';
+
 export interface ArenaEnvironmentHandle {
   group: THREE.Group;
   setOverload: (active: boolean) => void;
   setGraphicsLevel: (level: number) => void;
+  setPerfScale: (scale: number) => void;
   setStageAtmosphere: (stageIndex: number) => StageAtmosphere;
   setEnchantments: (playerSchool: MagicSchool | null, enemySchool: MagicSchool | null) => void;
   setTraps: (playerSchool: MagicSchool | null, enemySchool: MagicSchool | null) => void;
+  setLaneRunes: (runes?: {
+    player: Array<ArenaLaneRune | null>;
+    enemy: Array<ArenaLaneRune | null>;
+  }) => void;
+  triggerRoseFlare: (school: MagicSchool, intense?: boolean) => void;
+  setSlotAftermath: (aftermath?: {
+    player: Array<'chaos' | 'poison' | null>;
+    enemy: Array<'chaos' | 'poison' | null>;
+  }) => void;
   update: (time: number, parallaxX: number, parallaxY: number) => void;
   dispose: () => void;
 }
+
+const _flameDummy = new THREE.Object3D();
 
 /**
  * Ensures every geometry in a batch is non-indexed and shares the same attributes
@@ -151,6 +164,124 @@ function safeMerge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
   normalized.forEach((g) => g.dispose());
   parts.forEach((g) => g.dispose());
   return merged;
+}
+
+/**
+ * Procedural Gothic Stained-Glass Rose Mandala texture (radial leadwork + faceted glass panes)
+ * aligned to CircleGeometry / RingGeometry planar UVs centered at (0.5, 0.5).
+ */
+function createRoseMandalaTexture(size = 512): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d')!;
+  const cx = size * 0.5;
+  const cy = size * 0.5;
+  const rMax = size * 0.495;
+
+  ctx.fillStyle = '#0c0b12';
+  ctx.fillRect(0, 0, size, size);
+
+  const sectorCount = 12;
+  const sectorAngle = (Math.PI * 2) / sectorCount;
+
+  // Concentric stained-glass facet rings (inner core, middle lancets, outer crown petals)
+  const rings: Array<{ r0: number; r1: number; palette: string[] }> = [
+    {
+      r0: rMax * 0.68,
+      r1: rMax * 0.99,
+      palette: ['#d9a24c', '#b4622a', '#4f8da8', '#d4863b'],
+    },
+    {
+      r0: rMax * 0.36,
+      r1: rMax * 0.68,
+      palette: ['#3d9699', '#d29a48', '#336c8c', '#459e83'],
+    },
+    {
+      r0: 0,
+      r1: rMax * 0.36,
+      palette: ['#f0c975', '#52b8b5', '#d98f46', '#67c2a8'],
+    },
+  ];
+
+  rings.forEach((ring, ringIdx) => {
+    for (let i = 0; i < sectorCount; i++) {
+      const a0 = i * sectorAngle;
+      const a1 = (i + 1) * sectorAngle;
+      const midR = (ring.r0 + ring.r1) * 0.5;
+      const grad = ctx.createRadialGradient(
+        cx + Math.cos(a0 + sectorAngle * 0.5) * midR * 0.35,
+        cy + Math.sin(a0 + sectorAngle * 0.5) * midR * 0.35,
+        Math.max(2, ring.r0 * 0.3),
+        cx,
+        cy,
+        ring.r1
+      );
+      const baseHex = ring.palette[(i + ringIdx) % ring.palette.length];
+      grad.addColorStop(0, baseHex);
+      grad.addColorStop(0.72, baseHex);
+      grad.addColorStop(1, '#1a1a26');
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, ring.r1, a0, a1);
+      if (ring.r0 > 0) {
+        ctx.arc(cx, cy, ring.r0, a1, a0, true);
+      } else {
+        ctx.lineTo(cx, cy);
+      }
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+  });
+
+  // Subtle internal facet highlight diamonds in outer petal crown
+  for (let i = 0; i < sectorCount; i++) {
+    const aMid = (i + 0.5) * sectorAngle;
+    const pr = rMax * 0.83;
+    const px = cx + Math.cos(aMid) * pr;
+    const py = cy + Math.sin(aMid) * pr;
+    ctx.beginPath();
+    ctx.arc(px, py, rMax * 0.085, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 228, 165, 0.55)' : 'rgba(130, 224, 218, 0.45)';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#09090f';
+    ctx.stroke();
+  }
+
+  // Dark Gothic leadwork cames (radial spokes & concentric mullions)
+  ctx.strokeStyle = '#09090f';
+  ctx.lineWidth = 5;
+  [0.36, 0.68, 0.985].forEach((frac) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, rMax * frac, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  ctx.lineWidth = 4;
+  for (let i = 0; i < sectorCount; i++) {
+    const a = i * sectorAngle;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * rMax * 0.14, cy + Math.sin(a) * rMax * 0.14);
+    ctx.lineTo(cx + Math.cos(a) * rMax, cy + Math.sin(a) * rMax);
+    ctx.stroke();
+  }
+
+  // Sub-spokes in outer ring for authentic tracery density
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < sectorCount; i++) {
+    const a = (i + 0.5) * sectorAngle;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * rMax * 0.68, cy + Math.sin(a) * rMax * 0.68);
+    ctx.lineTo(cx + Math.cos(a) * rMax, cy + Math.sin(a) * rMax);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
 }
 
 export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironmentHandle {
@@ -194,24 +325,12 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
   customMats.push(skyMat);
   group.add(new THREE.Mesh(skyGeo, skyMat));
 
-  // 1. Central Wet-Basalt Planar Mirror Duel Platform (Signature Technique)
-  const mirrorGeo = new THREE.CircleGeometry(6.15, 8);
-  geometries.push(mirrorGeo);
-  const reflector = new Reflector(mirrorGeo, {
-    clipBias: 0.003,
-    textureWidth: 512,
-    textureHeight: 512,
-    color: 0x050508,
-  });
-  reflector.rotation.x = -Math.PI / 2;
-  reflector.rotation.z = Math.PI / 8;
-  reflector.position.y = -0.015;
-  group.add(reflector);
-
-  const slabGeo = new THREE.CylinderGeometry(6.25, 6.75, 0.56, 8);
+  // 1. Central Wet-Basalt Duel Platform (Aligned flush beneath the Bronze Octagonal Bezel)
+  const slabGeo = new THREE.CylinderGeometry(6.42, 6.92, 0.56, 8);
   geometries.push(slabGeo);
   const slab = new THREE.Mesh(slabGeo, mats.wetBasaltMat);
   slab.position.y = -0.28;
+  slab.rotation.y = Math.PI / 8;
   slab.receiveShadow = true;
   group.add(slab);
 
@@ -246,20 +365,24 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
   floorClockRing.position.y = 0.017;
   group.add(floorClockRing);
 
-  const cornerFinialGeo = new THREE.OctahedronGeometry(0.16, 0);
-  geometries.push(cornerFinialGeo);
-  const rimFinials: THREE.Mesh[] = [];
+  const rimFinialParts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-    const finial = new THREE.Mesh(cornerFinialGeo, mats.goldMat);
-    finial.position.set(Math.cos(a) * 6.32, 0.22, Math.sin(a) * 6.32);
-    finial.scale.set(0.75, 1.45, 0.75);
-    group.add(finial);
-    rimFinials.push(finial);
+    const fg = new THREE.OctahedronGeometry(0.16, 0);
+    fg.scale(0.75, 1.45, 0.75);
+    fg.translate(Math.cos(a) * 6.32, 0.22, Math.sin(a) * 6.32);
+    rimFinialParts.push(fg);
+  }
+  const mergedRimFinials = safeMerge(rimFinialParts);
+  let rimFinialsMesh: THREE.Mesh | null = null;
+  if (mergedRimFinials) {
+    geometries.push(mergedRimFinials);
+    rimFinialsMesh = new THREE.Mesh(mergedRimFinials, mats.goldMat);
+    group.add(rimFinialsMesh);
   }
 
   // 1b. Glowing Obsidian Floor Fracture Veins (subtle gold/ether normally, burning crimson on Overload)
-  const fissureGeo = new THREE.CircleGeometry(5.95, 8);
+  const fissureGeo = new THREE.CircleGeometry(5.88, 8);
   fissureGeo.rotateX(-Math.PI / 2);
   fissureGeo.rotateY(Math.PI / 8);
   geometries.push(fissureGeo);
@@ -544,21 +667,24 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
     repeat: 2,
     maxAnisotropy: 4,
   });
+  const roseMandalaTex = createRoseMandalaTexture(512);
   const roseOuterGlassGeo = new THREE.RingGeometry(1.72, 2.52, 32);
   geometries.push(roseOuterGlassGeo);
   const roseOuterGlassMat = new THREE.MeshPhysicalMaterial({
-    color: 0x3d2410,
-    emissive: 0x7d4c22,
-    emissiveIntensity: 0.54,
+    color: 0x8c5c2b,
+    map: roseMandalaTex,
+    emissive: 0xa86c32,
+    emissiveMap: roseMandalaTex,
+    emissiveIntensity: 0.72,
     normalMap: glassPair.normalMap,
-    normalScale: new THREE.Vector2(0.45, 0.45),
+    normalScale: new THREE.Vector2(0.32, 0.32),
     roughnessMap: glassPair.roughnessMap,
-    roughness: 0.28,
-    metalness: 0.06,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.32,
+    roughness: 0.24,
+    metalness: 0.05,
+    clearcoat: 0.32,
+    clearcoatRoughness: 0.28,
     transparent: true,
-    opacity: 0.48,
+    opacity: 0.78,
     side: THREE.DoubleSide,
   });
   customMats.push(roseOuterGlassMat);
@@ -569,18 +695,20 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
   const roseGlassGeo = new THREE.CircleGeometry(1.74, 28);
   geometries.push(roseGlassGeo);
   const roseGlassMat = new THREE.MeshPhysicalMaterial({
-    color: 0x133032,
-    emissive: 0x265c5e,
-    emissiveIntensity: 0.58,
+    color: 0x3b7a7c,
+    map: roseMandalaTex,
+    emissive: 0x458e91,
+    emissiveMap: roseMandalaTex,
+    emissiveIntensity: 0.78,
     normalMap: glassPair.normalMap,
-    normalScale: new THREE.Vector2(0.45, 0.45),
+    normalScale: new THREE.Vector2(0.32, 0.32),
     roughnessMap: glassPair.roughnessMap,
-    roughness: 0.26,
-    metalness: 0.06,
-    clearcoat: 0.35,
-    clearcoatRoughness: 0.32,
+    roughness: 0.22,
+    metalness: 0.05,
+    clearcoat: 0.32,
+    clearcoatRoughness: 0.28,
     transparent: true,
-    opacity: 0.52,
+    opacity: 0.82,
     side: THREE.DoubleSide,
   });
   customMats.push(roseGlassMat);
@@ -633,12 +761,10 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
     group.add(new THREE.Mesh(mergedGlass, lancetMat));
   }
 
-  // 5. Living Alchemical Braziers (8 ring braziers + 2 sanctuary pier sconces)
-  const brazierPedestalGeo = new THREE.CylinderGeometry(0.24, 0.34, 0.78, 6);
-  const brazierBowlGeo = new THREE.CylinderGeometry(0.42, 0.18, 0.28, 8);
+  // 5. Living Alchemical Braziers (8 ring braziers + 2 sanctuary pier sconces — static pedestals/bowls merged)
   const flameOuterGeo = new THREE.ConeGeometry(0.2, 0.56, 6);
   const flameInnerGeo = new THREE.ConeGeometry(0.1, 0.36, 5);
-  geometries.push(brazierPedestalGeo, brazierBowlGeo, flameOuterGeo, flameInnerGeo);
+  geometries.push(flameOuterGeo, flameInnerGeo);
 
   const flameOuterMat = new THREE.MeshStandardMaterial({
     color: 0x451205,
@@ -653,50 +779,81 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
   });
   customMats.push(flameOuterMat);
 
-  const flames: THREE.Group[] = [];
+  const pedestalParts: THREE.BufferGeometry[] = [];
+  const bowlParts: THREE.BufferGeometry[] = [];
+  const flameAnchors: Array<{ x: number; y: number; z: number; scale: number }> = [];
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
     const bx = Math.cos(a) * 6.55;
     const bz = Math.sin(a) * 6.55;
 
-    const stand = new THREE.Mesh(brazierPedestalGeo, mats.darkBronzeMat);
-    stand.position.set(bx, 0.39, bz);
-    stand.castShadow = true;
-    shadowCasters.push(stand);
-    group.add(stand);
+    const standGeo = new THREE.CylinderGeometry(0.24, 0.34, 0.78, 6);
+    standGeo.translate(bx, 0.39, bz);
+    pedestalParts.push(standGeo);
 
-    const bowl = new THREE.Mesh(brazierBowlGeo, mats.bronzeMat);
-    bowl.position.set(bx, 0.88, bz);
-    group.add(bowl);
+    const bowlGeo = new THREE.CylinderGeometry(0.42, 0.18, 0.28, 8);
+    bowlGeo.translate(bx, 0.88, bz);
+    bowlParts.push(bowlGeo);
 
-    const flameGroup = new THREE.Group();
-    flameGroup.position.set(bx, 1.02, bz);
-
-    const outerFlame = new THREE.Mesh(flameOuterGeo, flameOuterMat);
-    outerFlame.position.y = 0.26;
-    const innerFlame = new THREE.Mesh(flameInnerGeo, mats.flameEmissiveMat);
-    innerFlame.position.y = 0.22;
-    flameGroup.add(outerFlame, innerFlame);
-    group.add(flameGroup);
-    flames.push(flameGroup);
+    flameAnchors.push({ x: bx, y: 1.02, z: bz, scale: 1.0 });
   }
 
   [-3.25 * 0.88, 3.25 * 0.88].forEach((sx) => {
-    const sconceBowl = new THREE.Mesh(brazierBowlGeo, mats.bronzeMat);
-    sconceBowl.position.set(sx, 3.38, roseZ + 1.18);
-    group.add(sconceBowl);
+    const sconceBowlGeo = new THREE.CylinderGeometry(0.42, 0.18, 0.28, 8);
+    sconceBowlGeo.translate(sx, 3.38, roseZ + 1.18);
+    bowlParts.push(sconceBowlGeo);
 
-    const sFlame = new THREE.Group();
-    sFlame.position.set(sx, 3.52, roseZ + 1.18);
-    const outerFlame = new THREE.Mesh(flameOuterGeo, flameOuterMat);
-    outerFlame.position.y = 0.28;
-    const innerFlame = new THREE.Mesh(flameInnerGeo, mats.flameEmissiveMat);
-    innerFlame.position.y = 0.24;
-    sFlame.add(outerFlame, innerFlame);
-    sFlame.scale.setScalar(1.25);
-    group.add(sFlame);
-    flames.push(sFlame);
+    flameAnchors.push({ x: sx, y: 3.52, z: roseZ + 1.18, scale: 1.25 });
   });
+
+  // Batched InstancedMesh flames: 2 draw calls total instead of 20 individual flame meshes
+  const outerFlameInstanced = new THREE.InstancedMesh(flameOuterGeo, flameOuterMat, flameAnchors.length);
+  outerFlameInstanced.frustumCulled = false;
+  const innerFlameInstanced = new THREE.InstancedMesh(flameInnerGeo, mats.flameEmissiveMat, flameAnchors.length);
+  innerFlameInstanced.frustumCulled = false;
+
+  const updateInstancedFlames = (t: number) => {
+    flameAnchors.forEach((anchor, idx) => {
+      const flicker =
+        t > 0
+          ? 0.86 + Math.sin(t * 9.5 + idx * 1.7) * 0.2 + Math.cos(t * 15 + idx) * 0.08
+          : 1.0;
+      const sxz = anchor.scale * (0.92 + (flicker - 1) * 0.25);
+      const sy = anchor.scale * flicker;
+      const rotY = t * 1.8 + idx;
+
+      _flameDummy.position.set(anchor.x, anchor.y + 0.26 * sy, anchor.z);
+      _flameDummy.rotation.set(0, rotY, 0);
+      _flameDummy.scale.set(sxz, sy, sxz);
+      _flameDummy.updateMatrix();
+      outerFlameInstanced.setMatrixAt(idx, _flameDummy.matrix);
+
+      _flameDummy.position.set(anchor.x, anchor.y + 0.22 * sy, anchor.z);
+      _flameDummy.rotation.set(0, -rotY * 0.85, 0);
+      _flameDummy.scale.set(sxz, sy, sxz);
+      _flameDummy.updateMatrix();
+      innerFlameInstanced.setMatrixAt(idx, _flameDummy.matrix);
+    });
+    outerFlameInstanced.instanceMatrix.needsUpdate = true;
+    innerFlameInstanced.instanceMatrix.needsUpdate = true;
+  };
+  updateInstancedFlames(0);
+  group.add(outerFlameInstanced, innerFlameInstanced);
+
+  const mergedPedestals = safeMerge(pedestalParts);
+  if (mergedPedestals) {
+    geometries.push(mergedPedestals);
+    const pedestalsMesh = new THREE.Mesh(mergedPedestals, mats.darkBronzeMat);
+    pedestalsMesh.castShadow = true;
+    shadowCasters.push(pedestalsMesh);
+    group.add(pedestalsMesh);
+  }
+
+  const mergedBowls = safeMerge(bowlParts);
+  if (mergedBowls) {
+    geometries.push(mergedBowls);
+    group.add(new THREE.Mesh(mergedBowls, mats.bronzeMat));
+  }
 
   // Warm torchlight pools illuminating flanking Gothic arches & outer grass tiers
   const torchLightL = new THREE.PointLight(0xff9b4d, 5.2, 28, 1.4);
@@ -855,61 +1012,122 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
   group.add(godRaySpot);
   group.add(godRaySpot.target);
 
-  // Far parallax cathedral outer buttress ring + Vaulted Ceiling Ribs + Guardian Monoliths + Hanging Censers
+  // Far parallax cathedral outer buttress ring (THREE.LOD: high-detail 10 buttresses vs distant 5-pillar silhouette)
   const farSanctumGroup = new THREE.Group();
-  const outerArchGeo = new THREE.BoxGeometry(1.8, 15, 1.8);
-  geometries.push(outerArchGeo);
+  const farSanctumLod = new THREE.LOD();
+  const outerButtressParts: THREE.BufferGeometry[] = [];
+  const outerButtressLowParts: THREE.BufferGeometry[] = [];
   for (let i = 0; i < 10; i++) {
     const a = Math.PI * 0.78 + (i / 9) * Math.PI * 1.44;
     const rad = 18.5 + (i % 2) * 2.5;
-    const buttress = new THREE.Mesh(outerArchGeo, mats.sanctumWallMat);
-    buttress.position.set(Math.cos(a) * rad, 5.5, Math.sin(a) * rad);
-    buttress.rotation.y = -a;
-    farSanctumGroup.add(buttress);
+    const buttressGeo = new THREE.BoxGeometry(1.8, 15, 1.8);
+    buttressGeo.rotateY(-a);
+    buttressGeo.translate(Math.cos(a) * rad, 5.5, Math.sin(a) * rad);
+    outerButtressParts.push(buttressGeo);
+
+    if (i % 2 === 0) {
+      const lowGeo = new THREE.BoxGeometry(2.2, 14.2, 2.0);
+      lowGeo.rotateY(-a);
+      lowGeo.translate(Math.cos(a) * rad, 5.2, Math.sin(a) * rad);
+      outerButtressLowParts.push(lowGeo);
+    }
   }
+  const mergedButtresses = safeMerge(outerButtressParts);
+  if (mergedButtresses) {
+    geometries.push(mergedButtresses);
+    farSanctumLod.addLevel(new THREE.Mesh(mergedButtresses, mats.sanctumWallMat), 0);
+  }
+  const mergedButtressesLow = safeMerge(outerButtressLowParts);
+  if (mergedButtressesLow) {
+    geometries.push(mergedButtressesLow);
+    farSanctumLod.addLevel(new THREE.Mesh(mergedButtressesLow, mats.sanctumWallMat), 24);
+  }
+  farSanctumGroup.add(farSanctumLod);
   group.add(farSanctumGroup);
 
-  // Overhead Gothic Vault Ribs (High+)
-  const vaultRibGeo = new THREE.TorusGeometry(9.6, 0.24, 6, 26, Math.PI);
-  geometries.push(vaultRibGeo);
-  const vaultRibs: THREE.Mesh[] = [];
+  // Overhead Gothic Vault Ribs (High+, merged into single draw call)
+  const vaultRibParts: THREE.BufferGeometry[] = [];
   [-0.28, 0.0, 0.28].forEach((rotY) => {
-    const rib = new THREE.Mesh(vaultRibGeo, mats.pillarStoneMat);
-    rib.position.set(0, 6.2, -1.6);
-    rib.rotation.y = rotY;
-    group.add(rib);
-    vaultRibs.push(rib);
+    const ribGeo = new THREE.TorusGeometry(9.6, 0.24, 6, 26, Math.PI);
+    ribGeo.rotateY(rotY);
+    ribGeo.translate(0, 6.2, -1.6);
+    vaultRibParts.push(ribGeo);
   });
+  const mergedVaultRibs = safeMerge(vaultRibParts);
+  let vaultRibsMesh: THREE.Mesh | null = null;
+  if (mergedVaultRibs) {
+    geometries.push(mergedVaultRibs);
+    vaultRibsMesh = new THREE.Mesh(mergedVaultRibs, mats.pillarStoneMat);
+    group.add(vaultRibsMesh);
+  }
 
-  // Flanking Carved Reliquary Monoliths (High+)
-  const monolithBodyGeo = new THREE.CylinderGeometry(0.42, 0.68, 3.8, 6);
-  const monolithCapGeo = new THREE.ConeGeometry(0.48, 1.05, 6);
+  // Flanking Carved Reliquary Monoliths (THREE.LOD detail/silhouette + floating crystals)
   const monolithRuneGeo = new THREE.OctahedronGeometry(0.24, 0);
-  geometries.push(monolithBodyGeo, monolithCapGeo, monolithRuneGeo);
+  geometries.push(monolithRuneGeo);
   const monolithGroup = new THREE.Group();
-  const monolithCrystals: THREE.Mesh[] = [];
-  [
+  const monolithLod = new THREE.LOD();
+  const monolithDetailGroup = new THREE.Group();
+  const monolithLowGroup = new THREE.Group();
+
+  const monolithBodyParts: THREE.BufferGeometry[] = [];
+  const monolithCapParts: THREE.BufferGeometry[] = [];
+  const monolithLowParts: THREE.BufferGeometry[] = [];
+  const monolithCrystalCoords: Array<[number, number]> = [
     [-5.4, -8.2],
     [5.4, -8.2],
     [-7.8, -1.6],
     [7.8, -1.6],
-  ].forEach(([mx, mz], idx) => {
-    const body = new THREE.Mesh(monolithBodyGeo, mats.pillarStoneMat);
-    body.position.set(mx, 1.6, mz);
-    body.castShadow = true;
-    monolithGroup.add(body);
+  ];
+  const monolithCrystalInstanced = new THREE.InstancedMesh(
+    monolithRuneGeo,
+    mats.etherCoreMat,
+    monolithCrystalCoords.length
+  );
+  monolithCrystalInstanced.frustumCulled = false;
 
-    const cap = new THREE.Mesh(monolithCapGeo, mats.darkBronzeMat);
-    cap.position.set(mx, 4.02, mz);
-    monolithGroup.add(cap);
+  monolithCrystalCoords.forEach(([mx, mz], idx) => {
+    const bodyGeo = new THREE.CylinderGeometry(0.42, 0.68, 3.8, 6);
+    bodyGeo.translate(mx, 1.6, mz);
+    monolithBodyParts.push(bodyGeo);
 
-    const crys = new THREE.Mesh(monolithRuneGeo, mats.etherCoreMat);
-    crys.position.set(mx, 4.85, mz);
-    crys.scale.set(0.75, 1.45, 0.75);
-    monolithGroup.add(crys);
-    monolithCrystals.push(crys);
-    if (idx < 2) shadowCasters.push(body);
+    const capGeo = new THREE.ConeGeometry(0.48, 1.05, 6);
+    capGeo.translate(mx, 4.02, mz);
+    monolithCapParts.push(capGeo);
+
+    const lowGeo = new THREE.BoxGeometry(0.96, 4.1, 0.96);
+    lowGeo.translate(mx, 1.85, mz);
+    monolithLowParts.push(lowGeo);
+
+    _flameDummy.position.set(mx, 4.85, mz);
+    _flameDummy.rotation.set(0, idx, 0);
+    _flameDummy.scale.set(0.75, 1.45, 0.75);
+    _flameDummy.updateMatrix();
+    monolithCrystalInstanced.setMatrixAt(idx, _flameDummy.matrix);
   });
+  monolithCrystalInstanced.instanceMatrix.needsUpdate = true;
+  monolithCrystalInstanced.computeBoundingSphere();
+  monolithGroup.add(monolithCrystalInstanced);
+  const mergedMonolithBodies = safeMerge(monolithBodyParts);
+  if (mergedMonolithBodies) {
+    geometries.push(mergedMonolithBodies);
+    const monolithBodiesMesh = new THREE.Mesh(mergedMonolithBodies, mats.pillarStoneMat);
+    monolithBodiesMesh.castShadow = true;
+    shadowCasters.push(monolithBodiesMesh);
+    monolithDetailGroup.add(monolithBodiesMesh);
+  }
+  const mergedMonolithCaps = safeMerge(monolithCapParts);
+  if (mergedMonolithCaps) {
+    geometries.push(mergedMonolithCaps);
+    monolithDetailGroup.add(new THREE.Mesh(mergedMonolithCaps, mats.darkBronzeMat));
+  }
+  const mergedMonolithLow = safeMerge(monolithLowParts);
+  if (mergedMonolithLow) {
+    geometries.push(mergedMonolithLow);
+    monolithLowGroup.add(new THREE.Mesh(mergedMonolithLow, mats.pillarStoneMat));
+  }
+  monolithLod.addLevel(monolithDetailGroup, 0);
+  monolithLod.addLevel(monolithLowGroup, 21);
+  monolithGroup.add(monolithLod);
   group.add(monolithGroup);
 
   // Suspended Sanctuary Brass Censers / Chandeliers (High+)
@@ -942,24 +1160,35 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
   };
 
   const shardGeo = new THREE.OctahedronGeometry(0.32, 0);
-  const shardMat = new THREE.MeshStandardMaterial({
+  const shardMat = new THREE.MeshPhysicalMaterial({
     color: STAGE_ATMOSPHERES[0].rimHex,
     emissive: STAGE_ATMOSPHERES[0].rimHex,
-    emissiveIntensity: 0.55,
+    emissiveIntensity: 0.58,
     normalMap: glassPair.normalMap,
     roughnessMap: glassPair.roughnessMap,
-    metalness: 0.72,
-    roughness: 0.2,
+    metalness: 0.52,
+    roughness: 0.16,
+    clearcoat: 0.92,
+    clearcoatRoughness: 0.1,
+    iridescence: 0.68,
+    iridescenceIOR: 1.45,
   });
   geometries.push(shardGeo);
   customMats.push(shardMat);
-  const roseShards: THREE.Mesh[] = [];
-  for (let i = 0; i < 4; i++) {
-    const m = new THREE.Mesh(shardGeo, shardMat);
-    m.scale.set(0.75, 1.55, 0.75);
-    group.add(m);
-    roseShards.push(m);
+  const roseShardCount = 4;
+  const roseShardInstanced = new THREE.InstancedMesh(shardGeo, shardMat, roseShardCount);
+  roseShardInstanced.frustumCulled = false;
+  for (let i = 0; i < roseShardCount; i++) {
+    const a = (i * Math.PI) / 2;
+    _flameDummy.position.set(Math.cos(a) * 3.35, roseY + Math.sin(a * 1.5) * 1.35, roseZ + 0.85 + Math.sin(a) * 0.45);
+    _flameDummy.rotation.set(0, i, 0);
+    _flameDummy.scale.set(0.75, 1.55, 0.75);
+    _flameDummy.updateMatrix();
+    roseShardInstanced.setMatrixAt(i, _flameDummy.matrix);
   }
+  roseShardInstanced.instanceMatrix.needsUpdate = true;
+  roseShardInstanced.computeBoundingSphere();
+  group.add(roseShardInstanced);
 
   const obeliskCrystalGeo = new THREE.OctahedronGeometry(0.34, 0);
   obeliskCrystalGeo.scale(0.68, 2.1, 0.68);
@@ -971,14 +1200,18 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
     const obGroup = new THREE.Group();
     obGroup.position.set(x, 1.35, z);
     obGroup.visible = false;
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshPhysicalMaterial({
       color: 0x66ddd2,
       emissive: 0x66ddd2,
       emissiveIntensity: 0.85,
       normalMap: glassPair.normalMap,
       roughnessMap: glassPair.roughnessMap,
-      metalness: 0.55,
-      roughness: 0.2,
+      metalness: 0.42,
+      roughness: 0.15,
+      clearcoat: 0.92,
+      clearcoatRoughness: 0.1,
+      iridescence: 0.7,
+      iridescenceIOR: 1.44,
     });
     customMats.push(mat);
     const crystal = new THREE.Mesh(obeliskCrystalGeo, mat);
@@ -1138,7 +1371,7 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
 
   const maxRockCount = 1200;
   const rockInstanced = new THREE.InstancedMesh(rockBaseGeo, mats.pillarStoneMat, maxRockCount);
-  rockInstanced.castShadow = true;
+  rockInstanced.castShadow = false;
   rockInstanced.receiveShadow = true;
 
   for (let i = 0; i < maxRockCount; i++) {
@@ -1178,27 +1411,271 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
   rockInstanced.computeBoundingSphere();
   group.add(rockInstanced);
 
+  // 10. Instanced Sanctuary Votive Lantern Ring (24 InstancedMesh stone pillars + embers along terrace)
+  const votiveStandGeo = new THREE.CylinderGeometry(0.11, 0.16, 0.68, 6);
+  const votiveEmberGeo = new THREE.OctahedronGeometry(0.11, 0);
+  geometries.push(votiveStandGeo, votiveEmberGeo);
+
+  const maxVotiveCount = 24;
+  const votiveStandInstanced = new THREE.InstancedMesh(votiveStandGeo, mats.darkBronzeMat, maxVotiveCount);
+  const votiveEmberInstanced = new THREE.InstancedMesh(votiveEmberGeo, mats.flameEmissiveMat, maxVotiveCount);
+  votiveStandInstanced.castShadow = false;
+  votiveEmberInstanced.castShadow = false;
+  let votivePlaced = 0;
+  for (let i = 0; i < 32 && votivePlaced < maxVotiveCount; i++) {
+    const ang = (i / 32) * Math.PI * 2 + 0.08;
+    const rad = 11.45;
+    const vx = Math.cos(ang) * rad;
+    const vz = Math.sin(ang) * rad;
+    if (Math.abs(vx) < 2.35 && Math.abs(vz) > 5.4) continue;
+    if (Math.abs(vx) < 4.4 && vz < -9.4) continue;
+    _flameDummy.position.set(vx, 1.24, vz);
+    _flameDummy.rotation.set(0, ang, 0);
+    _flameDummy.scale.setScalar(1);
+    _flameDummy.updateMatrix();
+    votiveStandInstanced.setMatrixAt(votivePlaced, _flameDummy.matrix);
+
+    _flameDummy.position.set(vx, 1.66, vz);
+    _flameDummy.rotation.set(0, ang * 1.7, 0);
+    _flameDummy.scale.set(0.85, 1.25, 0.85);
+    _flameDummy.updateMatrix();
+    votiveEmberInstanced.setMatrixAt(votivePlaced, _flameDummy.matrix);
+    votivePlaced += 1;
+  }
+  votiveStandInstanced.count = votivePlaced;
+  votiveEmberInstanced.count = votivePlaced;
+  votiveStandInstanced.instanceMatrix.needsUpdate = true;
+  votiveEmberInstanced.instanceMatrix.needsUpdate = true;
+  votiveStandInstanced.computeBoundingSphere();
+  votiveEmberInstanced.computeBoundingSphere();
+  group.add(votiveStandInstanced, votiveEmberInstanced);
+
+  // 11. Instanced Floating Cathedral Votive Candles (20 levitating wax candles + warm flames, 2 draw calls)
+  const maxFloatingCandles = 20;
+  const floatingCandleBodyGeo = new THREE.CylinderGeometry(0.036, 0.046, 0.28, 6);
+  const floatingCandleFlameGeo = new THREE.OctahedronGeometry(0.045, 0);
+  geometries.push(floatingCandleBodyGeo, floatingCandleFlameGeo);
+
+  const floatingCandleWaxMat = new THREE.MeshPhysicalMaterial({
+    color: 0xc8ac7e,
+    emissive: 0x3b260c,
+    emissiveIntensity: 0.28,
+    roughness: 0.48,
+    metalness: 0.02,
+    clearcoat: 0.32,
+    clearcoatRoughness: 0.3,
+    sheen: 0.35,
+    sheenColor: new THREE.Color(0xffd48e),
+  });
+  customMats.push(floatingCandleWaxMat);
+
+  const floatingCandleBodyInst = new THREE.InstancedMesh(
+    floatingCandleBodyGeo,
+    floatingCandleWaxMat,
+    maxFloatingCandles
+  );
+  const floatingCandleFlameInst = new THREE.InstancedMesh(
+    floatingCandleFlameGeo,
+    mats.flameEmissiveMat,
+    maxFloatingCandles
+  );
+  floatingCandleBodyInst.frustumCulled = false;
+  floatingCandleFlameInst.frustumCulled = false;
+
+  const floatingCandleSeeds: Array<{ x: number; baseY: number; z: number; phase: number; speed: number; scale: number }> = [];
+  for (let i = 0; i < maxFloatingCandles; i++) {
+    const sideSign = i % 2 === 0 ? -1 : 1;
+    const bandAngle = -Math.PI * 0.42 + (i / maxFloatingCandles) * Math.PI * 0.84;
+    const rad = envRng.range(7.3, 9.5);
+    const fx = sideSign * (5.2 + Math.abs(Math.sin(bandAngle)) * 4.2);
+    const fz = Math.cos(bandAngle) * rad * 0.68 - 1.4;
+    floatingCandleSeeds.push({
+      x: fx,
+      baseY: envRng.range(2.6, 4.9),
+      z: fz,
+      phase: envRng.range(0, Math.PI * 2),
+      speed: envRng.range(0.95, 1.6),
+      scale: envRng.range(0.85, 1.25),
+    });
+  }
+
+  const updateFloatingCandles = (t: number) => {
+    const activeCount = floatingCandleBodyInst.count;
+    for (let i = 0; i < activeCount; i++) {
+      const c = floatingCandleSeeds[i];
+      const cy = c.baseY + Math.sin(t * c.speed + c.phase) * 0.16;
+      const tilt = Math.sin(t * 0.8 + c.phase) * 0.04;
+      _flameDummy.position.set(c.x, cy, c.z);
+      _flameDummy.rotation.set(tilt, c.phase + t * 0.25, -tilt);
+      _flameDummy.scale.setScalar(c.scale);
+      _flameDummy.updateMatrix();
+      floatingCandleBodyInst.setMatrixAt(i, _flameDummy.matrix);
+
+      const flicker = 0.88 + Math.sin(t * 10.5 + c.phase) * 0.18;
+      _flameDummy.position.set(c.x, cy + 0.22 * c.scale, c.z);
+      _flameDummy.rotation.set(0, t * 2.1 + c.phase, 0);
+      _flameDummy.scale.set(0.85 * c.scale, 1.35 * c.scale * flicker, 0.85 * c.scale);
+      _flameDummy.updateMatrix();
+      floatingCandleFlameInst.setMatrixAt(i, _flameDummy.matrix);
+    }
+    floatingCandleBodyInst.instanceMatrix.needsUpdate = true;
+    floatingCandleFlameInst.instanceMatrix.needsUpdate = true;
+  };
+  updateFloatingCandles(0);
+  group.add(floatingCandleBodyInst, floatingCandleFlameInst);
+
   const targetHorizon = new THREE.Color(STAGE_ATMOSPHERES[0].horizonHex);
   const targetMid = new THREE.Color(STAGE_ATMOSPHERES[0].midHex);
   const targetVault = new THREE.Color(STAGE_ATMOSPHERES[0].vaultHex);
   const stageRayColor = new THREE.Color(STAGE_ATMOSPHERES[0].rayHex);
+  const stageRoseInnerColor = new THREE.Color(STAGE_ATMOSPHERES[0].roseInnerHex);
+  const stageRoseOuterColor = new THREE.Color(STAGE_ATMOSPHERES[0].roseOuterHex);
+  const flareColor = new THREE.Color(0x5ec8be);
   const overloadRayColor = new THREE.Color(0xe8563a);
   let overloadState = false;
   let overloadBlend = 0;
+  let roseFlareTimer = 0;
+  let roseFlareDuration = 1.4;
+  let roseFlareIntensity = 1.0;
+
+  // Pooled 1-turn ground aftermath decals beneath the 8 combat lanes (chaos scorch / poison venom)
+  const laneX = [-3.0, -1.0, 1.0, 3.0];
+  const aftermathGeo = new THREE.RingGeometry(0.38, 0.59, 14);
+  aftermathGeo.rotateX(-Math.PI / 2);
+  geometries.push(aftermathGeo);
+  const aftermathDecals: Array<{
+    side: 'player' | 'enemy';
+    lane: number;
+    mesh: THREE.Mesh;
+    mat: THREE.MeshStandardMaterial;
+    kind: 'chaos' | 'poison' | null;
+  }> = [];
+  (['player', 'enemy'] as const).forEach((side) => {
+    for (let i = 0; i < 4; i++) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xef5a35,
+        emissive: 0xef5a35,
+        emissiveIntensity: 1.15,
+        roughness: 0.4,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      });
+      customMats.push(mat);
+      const mesh = new THREE.Mesh(aftermathGeo, mat);
+      mesh.position.set(laneX[i], 0.017, side === 'player' ? 1.75 : -1.75);
+      mesh.visible = false;
+      group.add(mesh);
+      aftermathDecals.push({ side, lane: i, mesh, mat, kind: null });
+    }
+  });
+
+  // Consecrated Lane Rune Crystal Sigils (player/enemy 4 lanes)
+  const laneRuneCrystalGeo = new THREE.OctahedronGeometry(0.14, 0);
+  laneRuneCrystalGeo.scale(0.8, 1.45, 0.8);
+  const laneRuneRingGeo = new THREE.RingGeometry(0.32, 0.39, 6);
+  laneRuneRingGeo.rotateX(-Math.PI / 2);
+  geometries.push(laneRuneCrystalGeo, laneRuneRingGeo);
+
+  const laneRuneHex: Record<ArenaLaneRune, number> = {
+    aegis: 0x5ec8be,
+    surge: 0xe2b354,
+    fury: 0xe56847,
+  };
+
+  const laneRuneMarkers: Array<{
+    side: 'player' | 'enemy';
+    lane: number;
+    holder: THREE.Group;
+    crystal: THREE.Mesh;
+    ring: THREE.Mesh;
+    mat: THREE.MeshPhysicalMaterial;
+    kind: ArenaLaneRune | null;
+  }> = [];
+
+  (['player', 'enemy'] as const).forEach((side) => {
+    for (let i = 0; i < 4; i++) {
+      const holder = new THREE.Group();
+      holder.position.set(laneX[i], 0.03, side === 'player' ? 1.75 : -1.75);
+      holder.visible = false;
+
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: 0x5ec8be,
+        emissive: 0x5ec8be,
+        emissiveIntensity: 1.05,
+        roughness: 0.16,
+        metalness: 0.25,
+        clearcoat: 0.9,
+        clearcoatRoughness: 0.12,
+        transparent: true,
+        opacity: 0.88,
+      });
+      customMats.push(mat);
+
+      const crystal = new THREE.Mesh(laneRuneCrystalGeo, mat);
+      crystal.position.set(0.42, 0.3, side === 'player' ? 0.34 : -0.34);
+      const ring = new THREE.Mesh(laneRuneRingGeo, mat);
+      ring.position.y = 0.008;
+      holder.add(crystal, ring);
+      group.add(holder);
+      laneRuneMarkers.push({ side, lane: i, holder, crystal, ring, mat, kind: null });
+    }
+  });
 
   let currentGraphicsLevel = getGraphicsLevel();
+  let perfScale = 1.0;
+
+  const syncInstanceCounts = () => {
+    const baseGrass =
+      currentGraphicsLevel >= GRAPHICS_LEVEL.ultra
+        ? maxGrassCount
+        : currentGraphicsLevel >= GRAPHICS_LEVEL.high
+          ? 1600
+          : currentGraphicsLevel >= GRAPHICS_LEVEL.medium
+            ? 900
+            : 400;
+    const baseRock =
+      currentGraphicsLevel >= GRAPHICS_LEVEL.ultra
+        ? maxRockCount
+        : currentGraphicsLevel >= GRAPHICS_LEVEL.high
+          ? 840
+          : currentGraphicsLevel >= GRAPHICS_LEVEL.medium
+            ? 480
+            : 200;
+    grassInstanced.count = Math.max(200, Math.round(baseGrass * perfScale));
+    rockInstanced.count = Math.max(120, Math.round(baseRock * perfScale));
+    const showVotives = currentGraphicsLevel >= GRAPHICS_LEVEL.medium;
+    votiveStandInstanced.visible = showVotives;
+    votiveEmberInstanced.visible = showVotives;
+    if (showVotives) {
+      const baseVotive =
+        currentGraphicsLevel >= GRAPHICS_LEVEL.high
+          ? votivePlaced
+          : Math.min(12, votivePlaced);
+      const scaledVotive = Math.max(6, Math.round(baseVotive * perfScale));
+      votiveStandInstanced.count = scaledVotive;
+      votiveEmberInstanced.count = scaledVotive;
+    }
+    const showFloatingCandles = currentGraphicsLevel >= GRAPHICS_LEVEL.high;
+    floatingCandleBodyInst.visible = showFloatingCandles;
+    floatingCandleFlameInst.visible = showFloatingCandles;
+    if (showFloatingCandles) {
+      const baseCandles = currentGraphicsLevel >= GRAPHICS_LEVEL.ultra ? maxFloatingCandles : 12;
+      const scaledCandles = Math.max(6, Math.round(baseCandles * perfScale));
+      floatingCandleBodyInst.count = scaledCandles;
+      floatingCandleFlameInst.count = scaledCandles;
+    }
+  };
 
   const applyGraphicsLevel = (level: number) => {
     currentGraphicsLevel = level;
-    reflector.visible = level >= GRAPHICS_LEVEL.high;
     fissureMesh.visible = level >= GRAPHICS_LEVEL.high;
     floorClockRing.visible = level >= GRAPHICS_LEVEL.medium;
-    rimFinials.forEach((m) => {
-      m.visible = level >= GRAPHICS_LEVEL.medium;
-    });
-    vaultRibs.forEach((m) => {
-      m.visible = level >= GRAPHICS_LEVEL.high;
-    });
+    if (rimFinialsMesh) rimFinialsMesh.visible = level >= GRAPHICS_LEVEL.medium;
+    if (vaultRibsMesh) vaultRibsMesh.visible = level >= GRAPHICS_LEVEL.high;
     monolithGroup.visible = level >= GRAPHICS_LEVEL.high;
     censers.forEach((m) => {
       m.visible = level >= GRAPHICS_LEVEL.high;
@@ -1219,27 +1696,10 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
     torchLightL.visible = level >= GRAPHICS_LEVEL.medium;
     torchLightR.visible = level >= GRAPHICS_LEVEL.medium;
     godRaySpot.visible = level >= GRAPHICS_LEVEL.high;
-    roseShards.forEach((m) => {
-      m.visible = level >= GRAPHICS_LEVEL.medium;
-    });
+    roseShardInstanced.visible = level >= GRAPHICS_LEVEL.medium;
 
-    grassInstanced.count =
-      level >= GRAPHICS_LEVEL.ultra
-        ? maxGrassCount
-        : level >= GRAPHICS_LEVEL.high
-          ? 1600
-          : level >= GRAPHICS_LEVEL.medium
-            ? 900
-            : 400;
-    rockInstanced.count =
-      level >= GRAPHICS_LEVEL.ultra
-        ? maxRockCount
-        : level >= GRAPHICS_LEVEL.high
-          ? 840
-          : level >= GRAPHICS_LEVEL.medium
-            ? 480
-            : 200;
-    rockInstanced.castShadow = level >= GRAPHICS_LEVEL.high;
+    syncInstanceCounts();
+    rockInstanced.castShadow = false;
     rockInstanced.receiveShadow = level >= GRAPHICS_LEVEL.high;
     grassInstanced.receiveShadow = level >= GRAPHICS_LEVEL.high;
   };
@@ -1251,6 +1711,12 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
       overloadState = active;
     },
     setGraphicsLevel: applyGraphicsLevel,
+    setPerfScale: (scale: number) => {
+      const clamped = Math.max(0.55, Math.min(1.0, scale));
+      if (Math.abs(clamped - perfScale) < 0.04) return;
+      perfScale = clamped;
+      syncInstanceCounts();
+    },
     setStageAtmosphere: (stageIndex: number): StageAtmosphere => {
       const idx = Math.max(0, Math.min(STAGE_ATMOSPHERES.length - 1, stageIndex));
       const atm = STAGE_ATMOSPHERES[idx];
@@ -1258,6 +1724,8 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
       targetMid.setHex(atm.midHex);
       targetVault.setHex(atm.vaultHex);
       stageRayColor.setHex(atm.rayHex);
+      stageRoseInnerColor.setHex(atm.roseInnerHex);
+      stageRoseOuterColor.setHex(atm.roseOuterHex);
       roseGlassMat.color.setHex(atm.roseInnerHex);
       roseGlassMat.emissive.setHex(atm.roseInnerHex);
       roseOuterGlassMat.color.setHex(atm.roseOuterHex);
@@ -1293,6 +1761,40 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
         enemyTrapSeal.mat.emissive.setHex(schoolColors[enemySchool]);
       }
     },
+    setLaneRunes: (runes) => {
+      for (const marker of laneRuneMarkers) {
+        const k = runes ? (marker.side === 'player' ? runes.player[marker.lane] : runes.enemy[marker.lane]) : null;
+        marker.kind = k ?? null;
+        if (!marker.kind) {
+          marker.holder.visible = false;
+        } else {
+          const hex = laneRuneHex[marker.kind];
+          marker.mat.color.setHex(hex);
+          marker.mat.emissive.setHex(hex);
+          marker.holder.visible = true;
+        }
+      }
+    },
+    triggerRoseFlare: (school: MagicSchool, intense = false) => {
+      flareColor.setHex(schoolColors[school]);
+      roseFlareDuration = intense ? 1.45 : 1.0;
+      roseFlareTimer = roseFlareDuration;
+      roseFlareIntensity = intense ? 1.0 : 0.72;
+    },
+    setSlotAftermath: (aftermath) => {
+      for (const dec of aftermathDecals) {
+        const k = aftermath ? (dec.side === 'player' ? aftermath.player[dec.lane] : aftermath.enemy[dec.lane]) : null;
+        dec.kind = k ?? null;
+        if (!dec.kind) {
+          dec.mesh.visible = false;
+        } else {
+          const hex = dec.kind === 'chaos' ? 0xef5a35 : 0x55d472;
+          dec.mat.color.setHex(hex);
+          dec.mat.emissive.setHex(hex);
+          dec.mesh.visible = true;
+        }
+      }
+    },
     update: (time: number, parallaxX: number, parallaxY: number) => {
       grassWindUniform.value = time;
       skyUniforms.uHorizon.value.lerp(targetHorizon, 0.08);
@@ -1301,6 +1803,30 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
 
       const targetOverload = overloadState ? 1.0 : 0.0;
       overloadBlend += (targetOverload - overloadBlend) * 0.12;
+
+      if (roseFlareTimer > 0) {
+        roseFlareTimer = Math.max(0, roseFlareTimer - 0.016);
+      }
+      const flareT = roseFlareTimer > 0 ? Math.sin((roseFlareTimer / roseFlareDuration) * Math.PI) * roseFlareIntensity : 0;
+
+      roseGlassMat.emissive.copy(stageRoseInnerColor).lerp(flareColor, flareT * 0.88);
+      roseGlassMat.emissiveIntensity = 0.78 + flareT * 1.45;
+      roseOuterGlassMat.emissive.copy(stageRoseOuterColor).lerp(flareColor, flareT * 0.72);
+      roseOuterGlassMat.emissiveIntensity = 0.72 + flareT * 1.2;
+
+      for (const dec of aftermathDecals) {
+        if (!dec.mesh.visible) continue;
+        dec.mesh.rotation.y = time * (dec.kind === 'chaos' ? 0.65 : -0.45) + dec.lane;
+        dec.mat.opacity = 0.42 + 0.16 * Math.sin(time * 4.0 + dec.lane * 1.3);
+      }
+
+      for (const marker of laneRuneMarkers) {
+        if (!marker.holder.visible) continue;
+        marker.crystal.position.y = 0.28 + Math.sin(time * 2.8 + marker.lane * 1.1) * 0.055;
+        marker.crystal.rotation.y = time * 1.45 + marker.lane * 0.7;
+        marker.ring.rotation.y = -time * 0.65 + marker.lane;
+        marker.mat.emissiveIntensity = 0.88 + 0.25 * Math.sin(time * 3.4 + marker.lane);
+      }
 
       if (floorClockRing.visible) {
         floorClockRing.rotation.y = time * 0.1;
@@ -1326,16 +1852,19 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
       }
 
       if (currentGraphicsLevel >= GRAPHICS_LEVEL.medium) {
-        roseShards.forEach((shard, idx) => {
+        for (let idx = 0; idx < roseShardCount; idx++) {
           const a = time * 0.38 + (idx * Math.PI) / 2;
-          shard.position.set(
+          _flameDummy.position.set(
             Math.cos(a) * 3.35,
             roseY + Math.sin(a * 1.5) * 1.35,
             roseZ + 0.85 + Math.sin(a) * 0.45
           );
-          shard.rotation.y = time * 1.1 + idx;
-          shard.rotation.z = Math.sin(time + idx) * 0.25;
-        });
+          _flameDummy.rotation.set(0, time * 1.1 + idx, Math.sin(time + idx) * 0.25);
+          _flameDummy.scale.set(0.75, 1.55, 0.75);
+          _flameDummy.updateMatrix();
+          roseShardInstanced.setMatrixAt(idx, _flameDummy.matrix);
+        }
+        roseShardInstanced.instanceMatrix.needsUpdate = true;
       }
 
       if (currentGraphicsLevel >= GRAPHICS_LEVEL.high) {
@@ -1343,39 +1872,55 @@ export function buildArenaEnvironment(mats: TarotMaterialLibrary): ArenaEnvironm
         fissureUniforms.uTime.value = time;
         fissureUniforms.uOverload.value = overloadBlend;
 
-        godRayUniforms.uColor.value.copy(stageRayColor).lerp(overloadRayColor, overloadBlend);
-        godRayConeMat.uniforms.uOpacity.value = 0.11 + overloadBlend * 0.05;
-        godRaySheetMat.uniforms.uOpacity.value = 0.08 + overloadBlend * 0.04;
+        godRayUniforms.uColor.value
+          .copy(stageRayColor)
+          .lerp(overloadRayColor, overloadBlend)
+          .lerp(flareColor, flareT * 0.85);
+        godRayConeMat.uniforms.uOpacity.value = (0.11 + overloadBlend * 0.05 + flareT * 0.11) * perfScale;
+        godRaySheetMat.uniforms.uOpacity.value = (0.08 + overloadBlend * 0.04 + flareT * 0.08) * perfScale;
 
         farSanctumGroup.position.x = -parallaxX * 0.7;
         farSanctumGroup.position.y = parallaxY * 0.25;
         roseCore.rotation.y = time * 0.8;
         roseCore.rotation.z = time * 0.4;
-        roseFiligree.rotation.z = -time * 0.14;
+        roseFiligree.rotation.z = -time * (0.14 + flareT * 0.75);
 
-        monolithCrystals.forEach((mc, idx) => {
-          mc.position.y = 4.85 + Math.sin(time * 1.8 + idx * 1.4) * 0.12;
-          mc.rotation.y = time * 0.9 + idx;
-        });
+        for (let idx = 0; idx < monolithCrystalCoords.length; idx++) {
+          const [mx, mz] = monolithCrystalCoords[idx];
+          _flameDummy.position.set(mx, 4.85 + Math.sin(time * 1.8 + idx * 1.4) * 0.12, mz);
+          _flameDummy.rotation.set(0, time * 0.9 + idx, 0);
+          _flameDummy.scale.set(0.75, 1.45, 0.75);
+          _flameDummy.updateMatrix();
+          monolithCrystalInstanced.setMatrixAt(idx, _flameDummy.matrix);
+        }
+        monolithCrystalInstanced.instanceMatrix.needsUpdate = true;
         censers.forEach((censer, idx) => {
           censer.rotation.z = Math.sin(time * 0.95 + idx * 1.5) * 0.055;
           censer.rotation.x = Math.cos(time * 0.75 + idx) * 0.03;
         });
 
-        flames.forEach((f, idx) => {
-          const flicker = 0.86 + Math.sin(time * 9.5 + idx * 1.7) * 0.2 + Math.cos(time * 15 + idx) * 0.08;
-          f.scale.set(0.92 + (flicker - 1) * 0.25, flicker, 0.92 + (flicker - 1) * 0.25);
-          f.rotation.y = time * 1.8 + idx;
-        });
-        torchLightL.intensity = 5.2 + Math.sin(time * 8.2) * 0.45;
-        torchLightR.intensity = 5.2 + Math.cos(time * 7.6) * 0.45;
-        godRaySpot.intensity = 1.28 + overloadBlend * 0.35 + Math.sin(time * 0.9) * 0.12;
+        updateInstancedFlames(time);
+        updateFloatingCandles(time);
+        torchLightL.intensity = (5.0 + Math.sin(time * 7.8) * 0.35 + Math.cos(time * 13.4) * 0.15) * perfScale;
+        torchLightR.intensity = (5.0 + Math.cos(time * 7.2) * 0.35 + Math.sin(time * 12.8) * 0.15) * perfScale;
+        godRaySpot.intensity = (1.28 + overloadBlend * 0.35 + flareT * 1.35 + Math.sin(time * 0.9) * 0.12) * perfScale;
+        godRaySpot.color.copy(stageRayColor).lerp(flareColor, flareT * 0.75);
       }
     },
     dispose: () => {
-      reflector.dispose();
       geometries.forEach((g) => g.dispose());
       customMats.forEach((m) => m.dispose());
+      outerFlameInstanced.dispose();
+      innerFlameInstanced.dispose();
+      votiveStandInstanced.dispose();
+      votiveEmberInstanced.dispose();
+      floatingCandleBodyInst.dispose();
+      floatingCandleFlameInst.dispose();
+      monolithCrystalInstanced.dispose();
+      roseShardInstanced.dispose();
+      grassInstanced.dispose();
+      rockInstanced.dispose();
+      roseMandalaTex.dispose();
       moatPair.normalMap.dispose();
       moatPair.roughnessMap.dispose();
       glassPair.normalMap.dispose();

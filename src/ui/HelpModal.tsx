@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Flame, Gamepad2, Palette, Shield, Sparkles, Swords, X } from 'lucide-react';
+import { BookOpen, Flame, Gamepad2, Maximize2, Minimize2, Palette, Shield, Sparkles, Swords, X } from 'lucide-react';
 import type { TranslationPack } from '../i18n/translations';
 import { StoneCorners, StoneDivider } from './StoneOrnament';
 
@@ -7,6 +7,8 @@ type HelpTabId = 'cards' | 'actions' | 'combat' | 'controls';
 
 interface HelpModalProps {
   t: TranslationPack;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   onClose: () => void;
 }
 
@@ -50,7 +52,12 @@ const CARD_SWATCH_STYLES: Record<
   },
 };
 
-export function HelpModal({ t, onClose }: HelpModalProps) {
+export function HelpModal({
+  t,
+  isFullscreen = false,
+  onToggleFullscreen,
+  onClose,
+}: HelpModalProps) {
   const [activeTab, setActiveTab] = useState<HelpTabId>('cards');
 
   const tabs: Array<{ id: HelpTabId; label: string; Icon: typeof Palette }> = [
@@ -99,15 +106,29 @@ export function HelpModal({ t, onClose }: HelpModalProps) {
             <p className="font-body mt-0.5 text-xs text-[#CFC2AE]">{t.helpSubtitle}</p>
           </div>
 
-          <button
-            type="button"
-            data-help-close="true"
-            onClick={onClose}
-            aria-label={t.helpClose}
-            className="stone-btn inline-flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center p-2 text-[#EAD9BD] hover:text-white"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {onToggleFullscreen && (
+              <button
+                type="button"
+                data-fullscreen-btn="true"
+                onClick={onToggleFullscreen}
+                aria-label={isFullscreen ? t.exitFullscreen : t.fullscreen}
+                title={isFullscreen ? t.exitFullscreen : t.fullscreen}
+                className="stone-btn inline-flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center p-2 text-[#E2B354] hover:text-white"
+              >
+                {isFullscreen ? <Minimize2 className="h-4 w-4" aria-hidden="true" /> : <Maximize2 className="h-4 w-4" aria-hidden="true" />}
+              </button>
+            )}
+            <button
+              type="button"
+              data-help-close="true"
+              onClick={onClose}
+              aria-label={t.helpClose}
+              className="stone-btn inline-flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center p-2 text-[#EAD9BD] hover:text-white"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         {/* Category Tabs */}

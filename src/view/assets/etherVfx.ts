@@ -151,6 +151,7 @@ export function buildEtherVfx(seed: number): EtherVfxHandle {
   let currentSchool: MagicSchool = 'kinet';
   let activeSparkCount = sparkCount;
   let currentLevel = getGraphicsLevel();
+  let sparkTickCounter = 0;
 
   const applyGraphicsLevel = (level: number) => {
     currentLevel = level;
@@ -199,15 +200,23 @@ export function buildEtherVfx(seed: number): EtherVfxHandle {
 
       moteMat.uniforms.uTime.value = time;
 
-      const speedMult = overloadActive ? 1.55 : 1.0;
+      // Throttle CPU matrix uploads on High tier to every 2nd tick while keeping Ultra at full 60fps
+      sparkTickCounter = (sparkTickCounter + 1) & 1;
+      if (currentLevel === GRAPHICS_LEVEL.high && sparkTickCounter === 1) return;
+
+      const speedScale = time * (overloadActive ? 0.31 : 0.2);
+      const tX = time * 0.42;
+      const tZ = time * 0.36;
+      const rotXBase = time * 0.8;
+      const rotY = time * 0.5;
       for (let i = 0; i < activeSparkCount; i++) {
-        const life = (time * speeds[i] * speedMult * 0.2 + offsets[i]) % 1;
-        const driftX = Math.sin(time * 0.42 + i * 1.3) * 0.55;
-        const driftZ = Math.cos(time * 0.36 + i * 0.9) * 0.55;
+        const life = (speedScale * speeds[i] + offsets[i]) % 1;
+        const driftX = Math.sin(tX + i * 1.3) * 0.55;
+        const driftZ = Math.cos(tZ + i * 0.9) * 0.55;
         _dummy.position.set(baseX[i] + driftX, 0.25 + life * 5.8, baseZ[i] + driftZ);
         const s = (1 - Math.abs(life * 2 - 1)) * 0.95;
-        _dummy.scale.setScalar(Math.max(0.06, s));
-        _dummy.rotation.set(time * 0.8 + i, time * 0.5, 0);
+        _dummy.scale.setScalar(s > 0.06 ? s : 0.06);
+        _dummy.rotation.set(rotXBase + i, rotY, 0);
         _dummy.updateMatrix();
         sparks.setMatrixAt(i, _dummy.matrix);
       }
